@@ -195,3 +195,7 @@ poetry.toml
 
 # SECRET
 SECRET
+
+# dev/run artifacts
+*.log
+*.session
