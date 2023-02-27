@@ -13,6 +13,8 @@ def get_argparser() -> argparse.ArgumentParser:
     parser.add_argument('--channel-file', required=True, help='File with channels to get info from')
     parser.add_argument('--log-file', default='app.log', help='Log file')
     parser.add_argument('--session-name', default='anon', help='Client session name')
+    parser.add_argument('--main-channel', default='Tesytesytesy',
+                        help='Channel to post downloaded media')
     return parser
 
 def setup_logging(filename: str) -> None:
@@ -35,7 +37,7 @@ def main() -> None:
     logger.addHandler(logging.StreamHandler())
     logger.debug('Started with args: %s, also unknown args: %s', args, unknown)
 
-    App(args.api_id, args.api_hash, args.channel_file, args.session_name).start()
+    App(args.api_id, args.api_hash, args.main_channel, args.channel_file, args.session_name).start()
 
 if __name__ == '__main__':
     main()
