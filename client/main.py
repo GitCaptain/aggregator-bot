@@ -3,7 +3,7 @@
 import argparse
 import logging
 from app import App
-
+import os
 
 def get_argparser() -> argparse.ArgumentParser:
     """Setup parser"""
@@ -15,6 +15,8 @@ def get_argparser() -> argparse.ArgumentParser:
     parser.add_argument('--session-name', default='anon', help='Client session name')
     parser.add_argument('--main-channel', default='Tesytesytesy',
                         help='Channel to post downloaded media')
+    parser.add_argument('--work-dir', default=os.path.join(os.path.curdir, 'app_work'),
+                        help='Directory with bot artifacts')
     return parser
 
 def setup_logging(filename: str) -> None:
@@ -33,11 +35,12 @@ def main() -> None:
 
     setup_logging(args.log_file)
     logger = logging.getLogger('Main')
-    logger.addHandler(logging.FileHandler(args.log_file))
+    logger.addHandler(logging.FileHandler(os.path.join(args.work_dir, args.log_file)))
     logger.addHandler(logging.StreamHandler())
     logger.debug('Started with args: %s, also unknown args: %s', args, unknown)
 
-    App(args.api_id, args.api_hash, args.main_channel, args.channel_file, args.session_name).start()
+    App(args.api_id, args.api_hash, args.work_dir) \
+        .start(args.session_name, args.main_channel, args.channel_file)
 
 if __name__ == '__main__':
     main()
