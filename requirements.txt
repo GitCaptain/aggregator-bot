@@ -1,5 +1,6 @@
 # https://docs.telethon.dev/en/stable/basic/installation.html#installation
 
-telethon==1.27.0  # main dependency - wrapper for tdlib api
-cryptg==0.4.0  # C encryption
-pillow==9.4.0  # Images will be automatically resized when sending photos
+telethon==1.27.0    # main dependency - wrapper for tdlib api
+cryptg==0.4.0       # C encryption
+pillow==9.4.0       # Images will be automatically resized when sending photos
+sqlalchemy==2.0.4   # work with database
