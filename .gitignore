@@ -199,3 +199,6 @@ SECRET
 # dev/run artifacts
 *.log
 *.session
+**/.DS_Store
+**/.vscode
+app_work
