@@ -2,8 +2,10 @@
 
 import argparse
 import logging
-from app import App
 import os
+
+from app import App
+
 
 def get_argparser() -> argparse.ArgumentParser:
     """Setup parser"""
