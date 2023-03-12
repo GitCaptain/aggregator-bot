@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from hashlib import sha256
-from typing import Optional, Union
+from typing import Optional
 
 import app
 import telethon
@@ -19,12 +19,7 @@ from telethon.errors import (
 )
 from telethon.tl.custom.message import Message
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.tl.types import (
-    InputMessagesFilterChatPhotos,
-    InputMessagesFilterGif,
-    InputMessagesFilterPhotoVideo,
-    TypeChat,
-)
+from telethon.tl.types import TypeChat
 
 
 class ChannelUpd:
@@ -94,7 +89,7 @@ class Bot:
     def restore_info(self, session: Session) -> list[ChannelUpd]:
         # TODO: optimize query
         self.logger.info('reading database')
-        msgs = self.db.select(session, MessageMapping).all()
+        msgs = self.db.select(session, MessageMapping)
         channels = self.db.select(session, ChannelMapping)
         info = {}
         ch_map: ChannelMapping
@@ -140,20 +135,16 @@ class Bot:
             await asyncio.sleep(sleep_time)
 
     async def _get_messages_since_id(self, channel: TypeChat, msg_id: int = 0) -> list[MessageUpd]:
-        # TODO: use these filters
-        # msg_filter = Union[InputMessagesFilterPhotoVideo, InputMessagesFilterGif]
         messages = []
         # fetch all messages (but no more then 3000) if we already have something from this channel,
         # else fetch latest message only
         limit = 3000 if msg_id else 1
         msg: Message
-        async for msg in self.client.iter_messages(channel, limit=limit, min_id=msg_id,
-                                                   filter=InputMessagesFilterPhotoVideo):
+        async for msg in self.client.iter_messages(channel, limit=limit, min_id=msg_id):
             logging.debug('get msg from chat %s, msg:', channel.title)
             logging.debug(msg.stringify())
-            if not msg.file:
-                logging.warning('No media in msg with id %s, downloaded from channel: %s',
-                                 msg.id, channel.title)
+            if not msg.video and not msg.photo and not msg.gif:
+                logging.debug('Msg with id %s: is not photo, video or gif', msg.id)
                 continue
             file_name = f'{channel.title.replace("/","_")}-{msg.file.title}-{msg.id}.{msg.file.ext}'
             file_path = os.path.join(self.owner.download_dir, file_name)
@@ -167,6 +158,7 @@ class Bot:
     async def _post_messages(self):
         # TODO: check messages are not posted before
         # TODO: post directly from message media
+        # TODO: multi-image messages?
         for file_name in os.listdir(self.owner.download_dir):
             print(file_name)
             if file_name == '.DS_Store':
