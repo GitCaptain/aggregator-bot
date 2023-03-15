@@ -19,7 +19,8 @@ from telethon.errors import (
 )
 from telethon.tl.custom.message import Message
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.tl.types import TypeChat
+from telethon.tl.functions.messages import ImportChatInviteRequest
+from telethon.tl.types import MessageMediaPhoto, TypeChat, TypeMessageMedia, Updates
 
 
 class ChannelUpd:
@@ -38,13 +39,17 @@ class ChannelUpd:
 
 class MessageUpd:
 
-    def __init__(self, msg_id: int, channel_id: int, hash: bytes):
+    def __init__(self, msg_id: int, msg_gruop_id: Optional[int], channel_id: int,
+                 text: Optional[str], media: Optional[TypeMessageMedia]):
         self.msg_id = msg_id
+        self.group_id = msg_gruop_id
         self.channel_id = channel_id
-        self.hash = hash
+        self.text = text
+        self.media = media
 
     def __repr__(self) -> str:
-        return f'<MessageUPD object, msg_id: {self.msg_id}, channel_id: {self.channel_id}>'
+        return f'<MessageUPD object, msg_id: {self.msg_id}, channel_id: {self.channel_id}, ' \
+               f'group_id: {self.group_id}, text: {self.text}>'
 
 
 def merge_infos(db_info: list[ChannelUpd], tg_info: list[TypeChat]) -> list[ChannelUpd]:
@@ -81,8 +86,8 @@ class Bot:
     async def start(self, main_channel: str) -> None:
         self.logger.info('bot started')
         self.logger.debug('signed in as: %s', (await self.client.get_me()).stringify())
-        main_channel_input_entt = self.client.get_input_entity(main_channel)
-        self.main_channel = await self.client.get_entity(await main_channel_input_entt)
+        main_channel_input_entt = await self.client.get_input_entity(main_channel)
+        self.main_channel = await self.client.get_entity(main_channel_input_entt)
         sleep_time = 5 * 60 # 5 min
         await self._mainloop(sleep_time)
 
@@ -104,17 +109,25 @@ class Bot:
 
         return [ChannelUpd(ch_id, *ch_info) for ch_id, ch_info in info.items()]
 
-    def save_info(self, session: Session, channels: list[ChannelUpd], messages: list[MessageUpd]
-        ) -> None:
+    def save_info(self, session: Session, channels: list[ChannelUpd],
+                  messages: list[list[MessageUpd]]) -> None:
         self.logger.info('update database')
         for channel in channels:
             ch_map = ChannelMapping(id=channel.id, username=channel.username)
             self.logger.debug(f'save {ch_map} to database')
             self.db.insert(session, ch_map)
-        for msg in messages:
-            msg_map = MessageMapping(msg_id=msg.msg_id, channel_id=msg.channel_id, hash=msg.hash)
-            self.logger.debug(f'save {msg_map} to database')
-            self.db.insert(session, msg_map)
+        for msg_group in messages:
+            for msg in msg_group:
+                # not sure if this is what I need to save
+                # https://core.telegram.org/api/file_reference
+                if isinstance(msg.media, MessageMediaPhoto):
+                    file_ref = msg.media.photo.file_reference
+                else:
+                    file_ref = msg.media.document.file_reference
+                msg_map = MessageMapping(msg_id=msg.msg_id, group_id=msg.group_id,
+                                         channel_id=msg.channel_id, hash=sha256(file_ref).digest())
+                self.logger.debug(f'save {msg_map} to database')
+                self.db.insert(session, msg_map)
 
     async def _mainloop(self, sleep_time: float) -> None:
         while True:
@@ -128,17 +141,19 @@ class Bot:
                 for ch_info in channels:
                     messages.extend(await self._get_messages_since_id(ch_info.entt,
                                                                       ch_info.latest_saved_msg_id))
-                await self._post_messages()
+                await self._post_messages(messages)
                 self.save_info(db_session, new_channels, messages)
                 db_session.commit()
             self.logger.debug(f'sleep {sleep_time}s')
             await asyncio.sleep(sleep_time)
 
-    async def _get_messages_since_id(self, channel: TypeChat, msg_id: int = 0) -> list[MessageUpd]:
+    async def _get_messages_since_id(self, channel: TypeChat, msg_id: int = 0) \
+        -> list[list[MessageUpd]]:
         messages = []
         # fetch all messages (but no more then 3000) if we already have something from this channel,
-        # else fetch latest message only
-        limit = 3000 if msg_id else 1
+        # else fetch 10 latest message (max in one group) only
+        limit = 3000 if msg_id else 10
+        last_grouped_id = None
         msg: Message
         async for msg in self.client.iter_messages(channel, limit=limit, min_id=msg_id):
             logging.debug('get msg from chat %s, msg:', channel.title)
@@ -146,39 +161,50 @@ class Bot:
             if not msg.video and not msg.photo and not msg.gif:
                 logging.debug('Msg with id %s: is not photo, video or gif', msg.id)
                 continue
-            file_name = f'{channel.title.replace("/","_")}-{msg.file.title}-{msg.id}.{msg.file.ext}'
-            file_path = os.path.join(self.owner.download_dir, file_name)
-            # TODO: check before save or do not save at all?
-            self.logger.debug(f'saving new file: {file_path}')
-            await msg.download_media(file=file_path)
-            media = msg.file.media.file_reference
-            messages.append(MessageUpd(msg.id, channel.id, sha256(media).digest()))
+            if msg.grouped_id is None or msg.grouped_id != last_grouped_id:
+                last_grouped_id = msg.grouped_id
+                messages.append([])
+            messages[-1].append(MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media))
         return messages
 
-    async def _post_messages(self):
+    async def _post_messages(self, messages: list[list[MessageUpd]]) -> None:
         # TODO: check messages are not posted before
-        # TODO: post directly from message media
-        # TODO: multi-image messages?
-        for file_name in os.listdir(self.owner.download_dir):
-            print(file_name)
-            if file_name == '.DS_Store':
-                continue
-            filepath = os.path.join(self.owner.download_dir, file_name)
-            with open(filepath, 'rb') as f:
-                self.logger.debug(f'post {filepath} to main channels')
-                await self.client.send_file(self.main_channel, f)
-            os.remove(filepath)
+        # Post in reverse order, since we add latest messages to the end of list
+        for msg_group in messages[::-1]:
+            text = ''
+            files = []
+            for msg in msg_group[::-1]:
+                text = msg.text or text
+                files.append(msg.media)
+            await self.client.send_file(self.main_channel, files, caption=text)
 
     async def _enumerate_channels(self) -> list[TypeChat]:
         channels_username = self.file_processor.channel_generator()
         channels = []
+        tme_prefix='https://t.me/'
+        joinchat='joinchat/'
         for channel_uname in channels_username:
-            try:
-                ent = self.client.get_input_entity(channel_uname)
-            except ValueError:
-                self.logger.error("Can't find input_entity for channel: %s", channel_uname)
-            channel_future = self.client.get_entity(await ent)
-            channels.append(await channel_future)
+            if channel_uname.startswith(tme_prefix):
+                # TODO: how to manage closed channels?
+                # i.e. what to use instead of username? hash?
+                link = channel_uname.replace(tme_prefix, '').replace(joinchat, '', 1).replace('+', '', 1)
+                self.logger.debug('trying to joing via link: %s', link)
+                try:
+                    upd: Updates = await self.client(ImportChatInviteRequest(link))
+                    self.logger.debug('get upd from private channel: %s', upd.stringify())
+                    # channels.append(upd) ??
+                except (telethon.errors.rpcerrorlist.InviteHashExpiredError,
+                        telethon.errors.rpcerrorlist.InviteHashEmptyError,
+                        telethon.errors.rpcerrorlist.InviteHashInvalidError,
+                        telethon.errors.rpcerrorlist.UserAlreadyParticipantError,
+                        telethon.errors.rpcerrorlist.InviteRequestSentError,) as e:
+                    self.logger.error('Error while trying to join private channel: %s', e)
+            else:
+                try:
+                    ent = await self.client.get_input_entity(channel_uname)
+                    channels.append(await self.client.get_entity(ent))
+                except ValueError:
+                    self.logger.error("Can't find input_entity for channel: %s", channel_uname)
         return channels
 
     async def _subscribe_channels(self, channels: list[TypeChat]) -> None:

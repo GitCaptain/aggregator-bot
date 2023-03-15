@@ -30,9 +30,10 @@ class Message(BaseORM):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     msg_id: Mapped[int]
+    group_id = Mapped[Optional[int]]
     channel_id: Mapped[int] = mapped_column(ForeignKey('channels.id'))
     hash: Mapped[Optional[bytes]]
 
     def __repr__(self) -> str:
         return f'<Message object, id: {self.id}, msg_id: {self.msg_id}, ' \
-               f'channel_id: {self.channel_id}>'
+               f'group_id: {self.group_id}, channel_id: {self.channel_id}>'
