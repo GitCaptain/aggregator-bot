@@ -15,6 +15,9 @@ class FileProcessor:
                 for channel in channels:
                     channel = channel.strip()
                     self.logger.info('channel parsed: %s', channel)
+                    if channel.startswith('#'):
+                        self.logger.debug('skip current channel')
+                        continue
                     yield channel
         except FileNotFoundError:
             # we do not want to shutdown bot if nothing found
