@@ -132,7 +132,8 @@ class Bot:
     async def _mainloop(self, sleep_time: float) -> None:
         while True:
             channels = await self._enumerate_channels()
-            await self._subscribe_channels(channels)
+            usernames = set(channel.username for channel in channels)
+            await self._subscribe_channels(channels, usernames)
             with self.db.get_session() as db_session, db_session.begin():
                 db_channels = self.restore_info(db_session)
                 new_channels = merge_infos(db_channels, channels)
@@ -207,21 +208,18 @@ class Bot:
                     self.logger.error("Can't find input_entity for channel: %s", channel_uname)
         return channels
 
-    async def _subscribe_channels(self, channels: list[TypeChat]) -> None:
-        channels_info = []
-        join_requests = []
+    async def _subscribe_channels(self, channels: list[TypeChat], subscribed: set[str]) -> None:
+
         err_msg = 'Unable to join channel: %s, reason: %s'
-
-        # TODO: Check if channel is joined (i.e. in my chat list already)
         # TODO: Mute and archive all chats
-
         for channel in channels:
-            channels_info.append(f'{channel.title} ({channel.username})')
-            join_requests.append(self.client(JoinChannelRequest(channel)))
-
-        for request, info in zip(join_requests, channels_info):
+            info = f'{channel.title} (@{channel.username})'
+            if channel.username in subscribed:
+                self.logger.debug(f'skip channel {info}, already subscribed')
+                continue
             try:
-                result = await request
+                result = await self.client(JoinChannelRequest(channel))
+                self.logger.info('Join channel request result: %s', result.stringify())
             except ChannelsTooMuchError:
                 self.logger.error(
                     err_msg, info, 'You have joined too many channels/supergroups.')
@@ -240,4 +238,3 @@ class Bot:
                 # Not sure what this error means, taken from docs
                 # https://tl.telethon.dev/methods/channels/join_channel.html
                 self.logger.error('You have successfully requested to join this chat or channel.')
-            self.logger.info('Join channel request result: %s', result.stringify())
