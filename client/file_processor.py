@@ -1,17 +1,20 @@
-
+"""File related utilities"""
 import logging
 from typing import Generator
 
 
 class FileProcessor:
+    """Process file with channel info"""
 
+    # pylint: disable=too-few-public-methods
     def __init__(self, file: str) -> None:
         self.file = file
         self.logger = logging.getLogger('Main.file_processor')
 
     def channel_generator(self) -> Generator[str, None, None]:
+        """Parse channel file, yields channel usernames line by line"""
         try:
-            with open(self.file) as channels:
+            with open(self.file, encoding='utf-8') as channels:
                 for channel in channels:
                     channel = channel.strip()
                     self.logger.info('channel parsed: %s', channel)
