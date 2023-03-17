@@ -1,6 +1,6 @@
+
 import asyncio
 import logging
-import os
 from hashlib import sha256
 from typing import Optional
 
@@ -177,7 +177,10 @@ class Bot:
             for msg in msg_group[::-1]:
                 text = msg.text or text
                 files.append(msg.media)
-            await self.client.send_file(self.main_channel, files, caption=text)
+            try:
+                await self.client.send_file(self.main_channel, files, caption=text)
+            except telethon.errors.rpcbaseerrors.BadRequestError as err:
+                self.logger.error("Can't send media: %s", err)
 
     async def _enumerate_channels(self) -> list[TypeChat]:
         channels_username = self.file_processor.channel_generator()
@@ -188,7 +191,8 @@ class Bot:
             if channel_uname.startswith(tme_prefix):
                 # TODO: how to manage closed channels?
                 # i.e. what to use instead of username? hash?
-                link = channel_uname.replace(tme_prefix, '').replace(joinchat, '', 1).replace('+', '', 1)
+                link = channel_uname\
+                        .replace(tme_prefix, '').replace(joinchat, '', 1).replace('+', '', 1)
                 self.logger.debug('trying to joing via link: %s', link)
                 try:
                     upd: Updates = await self.client(ImportChatInviteRequest(link))
