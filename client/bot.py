@@ -1,3 +1,4 @@
+"""Main bot functions"""
 
 import asyncio
 import logging
@@ -24,10 +25,14 @@ from telethon.tl.types import MessageMediaPhoto, TypeChat, TypeMessageMedia, Upd
 
 
 class ChannelUpd:
+    """Channel model for use with telethon objects"""
 
-    def __init__(self, id: int, username: str, latest_saved_msg_id: int,
+    # pylint: disable=invalid-name
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, _id: int, username: str, latest_saved_msg_id: int,
                  entt: Optional[TypeChat] = None) -> None:
-        self.id = id
+        self.id = _id
         self.username = username
         self.latest_saved_msg_id = latest_saved_msg_id
         self.entt = entt
@@ -38,6 +43,10 @@ class ChannelUpd:
 
 
 class MessageUpd:
+    """Message model for use with telethon objects"""
+
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, msg_id: int, msg_gruop_id: Optional[int], channel_id: int,
                  text: Optional[str], media: Optional[TypeMessageMedia]):
@@ -53,6 +62,7 @@ class MessageUpd:
 
 
 def merge_infos(db_info: list[ChannelUpd], tg_info: list[TypeChat]) -> list[ChannelUpd]:
+    """Merge info from database with new one coming from telegram"""
     new_chats = []
     for tg_chat in tg_info:
         matched = False
@@ -69,6 +79,7 @@ def merge_infos(db_info: list[ChannelUpd], tg_info: list[TypeChat]) -> list[Chan
     return new_chats
 
 class Bot:
+    """The bot which is downloading content from channels and repost it"""
 
     def __init__(self,
                  owner: 'app.App',
@@ -79,11 +90,13 @@ class Bot:
         self.file_processor = file_processor
         self.owner = owner
         self.logger = logging.getLogger('Main.bot')
-        self.me = None
         self.main_channel = None
+        # pylint: disable=invalid-name
+        self.me = None
         self.db = database
 
     async def start(self, main_channel: str) -> None:
+        """Bot entrypoint"""
         self.logger.info('bot started')
         self.logger.debug('signed in as: %s', (await self.client.get_me()).stringify())
         main_channel_input_entt = await self.client.get_input_entity(main_channel)
@@ -92,6 +105,7 @@ class Bot:
         await self._mainloop(sleep_time)
 
     def restore_info(self, session: Session) -> list[ChannelUpd]:
+        """Get info saved to database from previous runs"""
         # TODO: optimize query
         self.logger.info('reading database')
         msgs = self.db.select(session, MessageMapping)
@@ -99,11 +113,11 @@ class Bot:
         info = {}
         ch_map: ChannelMapping
         for ch_map in channels:
-            self.logger.debug(f'get {ch_map} from database')
+            self.logger.debug('get %s from database', ch_map)
             info[ch_map.id] = [ch_map.username, None]
         msg: MessageMapping
         for msg in msgs:
-            self.logger.debug(f'get {msg} from database')
+            self.logger.debug('get %s from database', msg)
             if not info[msg.channel_id][1] or info[msg.channel_id][1] < msg.msg_id:
                 info[msg.channel_id][1] = msg.msg_id
 
@@ -111,10 +125,11 @@ class Bot:
 
     def save_info(self, session: Session, channels: list[ChannelUpd],
                   messages: list[list[MessageUpd]]) -> None:
+        """Save info about new messages to database"""
         self.logger.info('update database')
         for channel in channels:
             ch_map = ChannelMapping(id=channel.id, username=channel.username)
-            self.logger.debug(f'save {ch_map} to database')
+            self.logger.debug('save %s to database', ch_map)
             self.db.insert(session, ch_map)
         for msg_group in messages:
             for msg in msg_group:
@@ -126,10 +141,11 @@ class Bot:
                     file_ref = msg.media.document.file_reference
                 msg_map = MessageMapping(msg_id=msg.msg_id, group_id=msg.group_id,
                                          channel_id=msg.channel_id, hash=sha256(file_ref).digest())
-                self.logger.debug(f'save {msg_map} to database')
+                self.logger.debug('save %s to database', msg_map)
                 self.db.insert(session, msg_map)
 
     async def _mainloop(self, sleep_time: float) -> None:
+        """main program loop: subscribe, restore info, get content, send content, save content"""
         while True:
             channels = await self._enumerate_channels()
             usernames = set(channel.username for channel in channels)
@@ -145,11 +161,12 @@ class Bot:
                 await self._post_messages(messages)
                 self.save_info(db_session, new_channels, messages)
                 db_session.commit()
-            self.logger.debug(f'sleep {sleep_time}s')
+            self.logger.debug('sleep %ss', sleep_time)
             await asyncio.sleep(sleep_time)
 
     async def _get_messages_since_id(self, channel: TypeChat, msg_id: int = 0) \
         -> list[list[MessageUpd]]:
+        """Get messages from channel starting from msg_id"""
         messages = []
         # fetch all messages (but no more then 3000) if we already have something from this channel,
         # else fetch 10 latest message (max in one group) only
@@ -169,6 +186,7 @@ class Bot:
         return messages
 
     async def _post_messages(self, messages: list[list[MessageUpd]]) -> None:
+        """Post messages to main_channel"""
         # TODO: check messages are not posted before
         # Post in reverse order, since we add latest messages to the end of list
         for msg_group in messages[::-1]:
@@ -183,6 +201,7 @@ class Bot:
                 self.logger.error("Can't send media: %s", err)
 
     async def _enumerate_channels(self) -> list[TypeChat]:
+        """Get already subscribed channels"""
         channels_username = self.file_processor.channel_generator()
         channels = []
         tme_prefix='https://t.me/'
@@ -202,8 +221,8 @@ class Bot:
                         telethon.errors.rpcerrorlist.InviteHashEmptyError,
                         telethon.errors.rpcerrorlist.InviteHashInvalidError,
                         telethon.errors.rpcerrorlist.UserAlreadyParticipantError,
-                        telethon.errors.rpcerrorlist.InviteRequestSentError,) as e:
-                    self.logger.error('Error while trying to join private channel: %s', e)
+                        telethon.errors.rpcerrorlist.InviteRequestSentError,) as err:
+                    self.logger.error('Error while trying to join private channel: %s', err)
             else:
                 try:
                     ent = await self.client.get_input_entity(channel_uname)
@@ -213,13 +232,13 @@ class Bot:
         return channels
 
     async def _subscribe_channels(self, channels: list[TypeChat], subscribed: set[str]) -> None:
-
+        """Subscribe to channels"""
         err_msg = 'Unable to join channel: %s, reason: %s'
         # TODO: Mute and archive all chats
         for channel in channels:
             info = f'{channel.title} (@{channel.username})'
             if channel.username in subscribed:
-                self.logger.debug(f'skip channel {info}, already subscribed')
+                self.logger.debug('skip channel %s, already subscribed', info)
                 continue
             try:
                 result = await self.client(JoinChannelRequest(channel))
