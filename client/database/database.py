@@ -1,7 +1,7 @@
 
 from typing import Type
 
-from sqlalchemy import ScalarResult, create_engine, select
+from sqlalchemy import ScalarResult, Select, create_engine, select
 from sqlalchemy.orm import Session
 
 from .database_mappings import BaseORM
@@ -16,8 +16,17 @@ class Database:
     def get_session(self) -> Session:
         return Session(self.engine)
 
-    def insert(self, session: Session, object: BaseORM) -> None:
+    @staticmethod
+    def insert(session: Session, object: BaseORM) -> None:
         session.add(object)
 
-    def select(self, session: Session, cls: Type[BaseORM]) -> ScalarResult[BaseORM]:
-        return session.scalars(select(cls))
+    @staticmethod
+    def select(cls: Type[BaseORM]) -> Select[tuple[BaseORM]]:
+        return select(cls)
+
+    @staticmethod
+    def execute_query(session: Session, query) -> ScalarResult[BaseORM]:
+        return session.scalars(query)
+
+    def select_result(self, session: Session, cls: Type[BaseORM]) -> ScalarResult[BaseORM]:
+        return session.scalars(self.select(cls))

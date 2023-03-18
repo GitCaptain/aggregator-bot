@@ -72,9 +72,14 @@ def merge_infos(db_info: list[ChannelUpd], tg_info: list[TypeChat]) -> list[Chan
                 db_chat.entt = tg_chat
                 matched = True
                 break
+        # Not matched - 2 variants:
+        # 1 - channel removed from list of content providers - old info remains in database,
+        # but it doesn't exists in current tg_info
+        # 2 - channel added to content provider list and doesn't have database entry yet.
+        # 1st case - only get channels from db that are currently in content provider
+        # (fixed outside this function), 2nd - create new channel, that will be placed to database
         if not matched:
             new_chats.append(ChannelUpd(tg_chat.id, tg_chat.username, 0, tg_chat))
-    # TODO: channel deleted from file ? remove assert
     assert all(ch.entt is not None for ch in new_chats + db_info)
     return new_chats
 
@@ -104,12 +109,15 @@ class Bot:
         sleep_time = 5 * 60 # 5 min
         await self._mainloop(sleep_time)
 
-    def restore_info(self, session: Session) -> list[ChannelUpd]:
-        """Get info saved to database from previous runs"""
+    def restore_info(self, session: Session, usernames: set[str]) -> list[ChannelUpd]:
+        """Get info saved to database from previous runs
+           We only need to get chats with usernames that are currently intresting
+        """
         # TODO: optimize query
         self.logger.info('reading database')
-        msgs = self.db.select(session, MessageMapping)
-        channels = self.db.select(session, ChannelMapping)
+        msgs = self.db.select_result(session, MessageMapping)
+        channels = self.db.execute_query(session, self.db.select(ChannelMapping)
+                                                    .filter(ChannelMapping.username.in_(usernames)))
         info = {}
         ch_map: ChannelMapping
         for ch_map in channels:
@@ -151,7 +159,7 @@ class Bot:
             usernames = set(channel.username for channel in channels)
             await self._subscribe_channels(channels, usernames)
             with self.db.get_session() as db_session, db_session.begin():
-                db_channels = self.restore_info(db_session)
+                db_channels = self.restore_info(db_session, usernames)
                 new_channels = merge_infos(db_channels, channels)
                 channels = new_channels + db_channels
                 messages = []
@@ -197,7 +205,7 @@ class Bot:
                 files.append(msg.media)
             try:
                 await self.client.send_file(self.main_channel, files, caption=text)
-            except telethon.errors.rpcbaseerrors.BadRequestError as err:
+            except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
                 self.logger.error("Can't send media: %s", err)
 
     async def _enumerate_channels(self) -> list[TypeChat]:
