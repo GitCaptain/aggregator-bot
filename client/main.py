@@ -21,26 +21,41 @@ def get_argparser() -> argparse.ArgumentParser:
                         help='Directory with bot artifacts')
     return parser
 
-def setup_logging(filename: str) -> None:
-    """Setup basic logger parameters
-        :param: filename - logger output file
-    """
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        filename=filename)
+def setup_logging(logger: logging.Logger, filepath: str) -> None:
+    """Setup logger handlers"""
+
+    fh = logging.FileHandler(filepath)
+    dbg_fh = logging.FileHandler(f'{filepath}.full')
+    sh = logging.StreamHandler()
+
+    fh.setLevel(logging.INFO)
+    dbg_fh.setLevel(logging.DEBUG)
+    sh.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s: %(message)s')
+    dbg_formatter = logging.Formatter(
+                            '%(asctime)s - %(levelname)s - %(module)s - %(funcName)s: %(message)s')
+    fh.setFormatter(formatter)
+    dbg_fh.setFormatter(dbg_formatter)
+    sh.setFormatter(formatter)
+
+    logging.basicConfig(level=logging.DEBUG, handlers=[fh, sh])
+
+    # set app logger
+    logger.addHandler(dbg_fh)
+
+    # set telethon logger
+    telethonlog = logging.getLogger('telethon')
+    telethonlog.addHandler(dbg_fh)
 
 def main() -> None:
     """program entrypoint"""
     parser = get_argparser()
     args, unknown = parser.parse_known_args()
 
-    setup_logging(args.log_file)
     logger = logging.getLogger('Main')
-    logger.addHandler(logging.FileHandler(os.path.join(args.work_dir, args.log_file)))
-    logger.addHandler(logging.StreamHandler())
-    logger.debug('Started with args: %s, also unknown args: %s', args, unknown)
-
+    setup_logging(logger, os.path.join(args.work_dir, args.log_file))
+    logger.info('Started with args: %s, also unknown args: %s', args, unknown)
     App(args.api_id, args.api_hash, args.work_dir) \
         .start(args.session_name, args.main_channel, args.channel_file)
 
