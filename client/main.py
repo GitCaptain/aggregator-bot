@@ -24,6 +24,7 @@ def get_argparser() -> argparse.ArgumentParser:
 def setup_logging(logger: logging.Logger, filepath: str) -> None:
     """Setup logger handlers"""
 
+    # TODO: add handler to send error to user
     fh = logging.FileHandler(filepath)
     dbg_fh = logging.FileHandler(f'{filepath}.full')
     sh = logging.StreamHandler()
