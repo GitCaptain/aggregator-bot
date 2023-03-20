@@ -65,8 +65,8 @@ class MessageUpd:
         self.url = is_url
         try:
             self.sha256 = self._calc_hash()
-        except:
-            raise ValueError
+        except Exception as e:
+            raise ValueError from e
 
     def _calc_hash(self) -> bytes:
         """Calculate hash for given media for future store/check if exist"""
@@ -209,12 +209,12 @@ class Bot:
                 last_grouped_id = msg.grouped_id
                 messages.append([])
             try:
-                _, url = msg.get_entities_text(MessageEntityTextUrl)
+                urls = msg.get_entities_text(MessageEntityTextUrl)
                 m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media,
-                                   bool(url))
+                                   bool(urls))
                 messages[-1].append(m_upd)
-            except ValueError:
-                self.logger.error('Unknown message media type: %s', type(msg.media))
+            except ValueError as v:
+                self.logger.error('Unknown message media type: %s, err: %s', type(msg.media), v)
         return messages
 
     def _get_posted(self, hashes: Iterable[bytes], db_session: Session) -> set[bytes]:
@@ -232,7 +232,7 @@ class Bot:
         if len(msg_text) > 50:
             # too long for meme
             return False
-        if '#' is msg_text:
+        if '#' in msg_text:
             # probably some #adv tag
             return False
         return True
