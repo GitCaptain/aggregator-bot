@@ -149,7 +149,8 @@ class Bot:
         # TODO: if channel deleted from file: info[msg.channel_id] will raise KeyError
         for msg in msgs:
             self.logger.debug('get %s from database', msg)
-            if not info[msg.channel_id][1] or info[msg.channel_id][1] < msg.msg_id:
+            if info.get(msg.channel_id) and \
+               (not info[msg.channel_id][1] or info[msg.channel_id][1] < msg.msg_id):
                 info[msg.channel_id][1] = msg.msg_id
 
         return [ChannelUpd(ch_id, *ch_info) for ch_id, ch_info in info.items()]
