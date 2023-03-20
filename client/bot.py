@@ -23,7 +23,7 @@ from telethon.tl.custom.message import Message
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from telethon.tl.types import (
-    MessageMediaDocument,
+    MessageEntityTextUrl,
     MessageMediaPhoto,
     TypeChat,
     TypeMessageMedia,
@@ -56,12 +56,13 @@ class MessageUpd:
     # pylint: disable=too-few-public-methods
 
     def __init__(self, msg_id: int, msg_gruop_id: Optional[int], channel_id: int,
-                 text: Optional[str], media: Optional[TypeMessageMedia]):
+                 text: Optional[str], media: Optional[TypeMessageMedia], is_url: bool):
         self.msg_id = msg_id
         self.group_id = msg_gruop_id
         self.channel_id = channel_id
         self.text = text
         self.media = media
+        self.url = is_url
         try:
             self.sha256 = self._calc_hash()
         except:
@@ -207,7 +208,9 @@ class Bot:
                 last_grouped_id = msg.grouped_id
                 messages.append([])
             try:
-                m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media)
+                _, url = msg.get_entities_text(MessageEntityTextUrl)
+                m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media,
+                                   bool(url))
                 messages[-1].append(m_upd)
             except ValueError:
                 self.logger.error('Unknown message media type: %s', type(msg.media))
@@ -219,6 +222,19 @@ class Bot:
                                                self.db.select(MessageMapping.hash)
                                                       .filter(MessageMapping.hash.in_(hashes)))
                                                       .all())
+
+    def _is_text_ok(self, msg_text: str, url: bool):
+        """Do my best to filter out messages"""
+        if url:
+            # probably some advertisement link
+            return False
+        if len(msg_text) > 50:
+            # too long for meme
+            return False
+        if '#' is msg_text:
+            # probably some #adv tag
+            return False
+        return True
 
     async def _post_messages(self, messages: list[list[MessageUpd]], db_session: Session) -> None:
         """Post messages to main_channel"""
@@ -233,9 +249,14 @@ class Bot:
                 continue
             text = ''
             files = []
+            url = False
             for msg in msg_group[::-1]:
                 text = msg.text or text
+                url = msg.url or url
                 files.append(msg.media)
+            if not self._is_text_ok(text, url):
+                # do not post this message, but save it to db to filter it out on the previous step.
+                continue
             try:
                 await self.client.send_file(self.main_channel, files, caption=text)
             except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
