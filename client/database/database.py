@@ -20,6 +20,7 @@ class Database:
     def insert(session: Session, object: BaseORM) -> None:
         session.add(object)
 
+    # TODO: Fix types, it should actually be Any?
     @staticmethod
     def select(cls: Type[BaseORM]) -> Select[tuple[BaseORM]]:
         return select(cls)

@@ -1,9 +1,10 @@
 """Main bot functions"""
 
 import asyncio
+import itertools
 import logging
 from hashlib import sha256
-from typing import Optional
+from typing import Iterable, Optional
 
 import app
 import telethon
@@ -21,7 +22,13 @@ from telethon.errors import (
 from telethon.tl.custom.message import Message
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from telethon.tl.types import MessageMediaPhoto, TypeChat, TypeMessageMedia, Updates
+from telethon.tl.types import (
+    MessageMediaDocument,
+    MessageMediaPhoto,
+    TypeChat,
+    TypeMessageMedia,
+    Updates,
+)
 
 
 class ChannelUpd:
@@ -55,6 +62,20 @@ class MessageUpd:
         self.channel_id = channel_id
         self.text = text
         self.media = media
+        try:
+            self.sha256 = self._calc_hash()
+        except:
+            raise ValueError
+
+    def _calc_hash(self) -> bytes:
+        """Calculate hash for given media for future store/check if exist"""
+        # not sure if this is what I need to save
+        # https://core.telegram.org/api/file_reference
+        if isinstance(self.media, MessageMediaPhoto):
+            file_ref = self.media.photo.file_reference
+        else:
+            file_ref = self.media.document.file_reference
+        return sha256(file_ref).digest()
 
     def __repr__(self) -> str:
         return f'<MessageUPD object, msg_id: {self.msg_id}, channel_id: {self.channel_id}, ' \
@@ -124,6 +145,7 @@ class Bot:
             self.logger.debug('get %s from database', ch_map)
             info[ch_map.id] = [ch_map.username, None]
         msg: MessageMapping
+        # TODO: if channel deleted from file: info[msg.channel_id] will raise KeyError
         for msg in msgs:
             self.logger.debug('get %s from database', msg)
             if not info[msg.channel_id][1] or info[msg.channel_id][1] < msg.msg_id:
@@ -141,14 +163,8 @@ class Bot:
             self.db.insert(session, ch_map)
         for msg_group in messages:
             for msg in msg_group:
-                # not sure if this is what I need to save
-                # https://core.telegram.org/api/file_reference
-                if isinstance(msg.media, MessageMediaPhoto):
-                    file_ref = msg.media.photo.file_reference
-                else:
-                    file_ref = msg.media.document.file_reference
                 msg_map = MessageMapping(msg_id=msg.msg_id, group_id=msg.group_id,
-                                         channel_id=msg.channel_id, hash=sha256(file_ref).digest())
+                                         channel_id=msg.channel_id, hash=msg.sha256)
                 self.logger.debug('save %s to database', msg_map)
                 self.db.insert(session, msg_map)
 
@@ -166,7 +182,7 @@ class Bot:
                 for ch_info in channels:
                     messages.extend(await self._get_messages_since_id(ch_info.entt,
                                                                       ch_info.latest_saved_msg_id))
-                await self._post_messages(messages)
+                await self._post_messages(messages, db_session)
                 self.save_info(db_session, new_channels, messages)
                 db_session.commit()
             self.logger.debug('sleep %ss', sleep_time)
@@ -190,14 +206,31 @@ class Bot:
             if msg.grouped_id is None or msg.grouped_id != last_grouped_id:
                 last_grouped_id = msg.grouped_id
                 messages.append([])
-            messages[-1].append(MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media))
+            try:
+                m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media)
+                messages[-1].append(m_upd)
+            except ValueError:
+                self.logger.error('Unknown message media type: %s', type(msg.media))
         return messages
 
-    async def _post_messages(self, messages: list[list[MessageUpd]]) -> None:
+    def _get_posted(self, hashes: Iterable[bytes], db_session: Session) -> set[bytes]:
+        """Select only those hashes from hashes, which exists in database"""
+        return frozenset(self.db.execute_query(db_session,
+                                               self.db.select(MessageMapping.hash)
+                                                      .filter(MessageMapping.hash.in_(hashes)))
+                                                      .all())
+
+    async def _post_messages(self, messages: list[list[MessageUpd]], db_session: Session) -> None:
         """Post messages to main_channel"""
-        # TODO: check messages are not posted before
+        posted = self._get_posted(map(lambda msg: msg.sha256,
+                                      itertools.chain.from_iterable(messages)),
+                                  db_session)
         # Post in reverse order, since we add latest messages to the end of list
         for msg_group in messages[::-1]:
+            # do not post messages if full group posted already
+            # if only some messages from the group exist - it may be new meme
+            if set(map(lambda msg: msg.sha256, msg_group)).issubset(posted):
+                continue
             text = ''
             files = []
             for msg in msg_group[::-1]:
