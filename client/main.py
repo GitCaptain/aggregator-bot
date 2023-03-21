@@ -15,8 +15,7 @@ def get_argparser() -> argparse.ArgumentParser:
     parser.add_argument('--channel-file', required=True, help='File with channels to get info from')
     parser.add_argument('--log-file', default='app.log', help='Log file')
     parser.add_argument('--session-name', default='anon', help='Client session name')
-    parser.add_argument('--main-channel', default='Tesytesytesy',
-                        help='Channel to post downloaded media')
+    parser.add_argument('--main-channel', required=True, help='Channel to post downloaded media')
     parser.add_argument('--work-dir', default=os.path.join(os.path.curdir, 'app_work'),
                         help='Directory with bot artifacts')
     return parser
