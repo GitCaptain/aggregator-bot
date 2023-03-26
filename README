@@ -13,7 +13,6 @@ username3
 # username4 - will be ignored
 username5
 ....
-
 ```
 
 To start app you need to run bootstrap script with info from previous steps:
@@ -24,4 +23,4 @@ echo your_api_hash > SECRET_DIR/api_hash
 ./bootstrap.sh --secret-dir /path/to/SECRET_DIR --channel-file path/to/channelfile --main-channel your_tg_channel
 ```
 
-** Please, note: on the first run (e.g. you do not have session file yet) you will have to login into your telegramm account **
+**Please, note: on the first run (e.g. you do not have session file yet) you will have to login into your telegramm account**
