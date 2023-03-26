@@ -190,3 +190,15 @@ poetry.toml
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode
+
+
+
+# SECRET
+SECRET
+
+# dev/run artifacts
+*.log
+*.session
+**/.DS_Store
+**/.vscode
+app_work

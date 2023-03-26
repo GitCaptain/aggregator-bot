@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "client_aggregator_bot"
+version = "0.0.1"
+authors = [
+  { name="Sukhikh Alexander", email="AlexSM.RF24@gmail.com" },
+]
+description = "Bot to monitor tg channels and aggregate info"
+readme = "README.md"
+requires-python = "==3.9.*"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/GitCaptain/aggregator-bot"
+"Bug Tracker" = "https://github.com/GitCaptain/aggregator-bot/issues"
