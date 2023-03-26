@@ -41,16 +41,19 @@ while (($#)); do
     esac
 done
 
-[[ -z ${SECRET_DIR} || -z ${CHANNEL_FILE} || -z ${MAIN_CHANNEL}]] \
-    && echo "Secret dir or channel file not provided" && exit 1
+[[ -z ${SECRET_DIR} || -z ${CHANNEL_FILE} || -z ${MAIN_CHANNEL} ]] && \
+    echo > "Secret dir, channel file ot main channel are not provided" && exit 1
 
-echo creating docker volume with name: ${ARTIFACTS_VOLUME}
+echo > creating docker volume with name: ${ARTIFACTS_VOLUME}
 docker volume create ${ARTIFACTS_VOLUME}
 
-echo start docker build
-docker build --tag app_bot:0.1 .
+echo > start docker build
+docker build --tag app_bot:0.1 --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
 
-echo run docker container
+echo > stop previous container
+docker container rm -f tg-client-bot
+
+echo > run docker container
 channel_file_dir="$(dirname ${CHANNEL_FILE})"
 channel_file_name="$(basename ${CHANNEL_FILE})"
 docker run \
