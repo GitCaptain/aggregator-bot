@@ -35,9 +35,3 @@ class App:
     @working_dir.setter
     def working_dir(self, dir) -> None:
         self._working_dir = dir
-
-    @property
-    def download_dir(self) -> str:
-        dir = os.path.join(self.working_dir, 'downloads')
-        os.makedirs(dir, exist_ok=True)
-        return dir
