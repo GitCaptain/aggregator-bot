@@ -62,6 +62,7 @@ docker run \
     --network host \
     --mount source="${ARTIFACTS_VOLUME}",target="/${ARTIFACTS_VOLUME}" \
     --name tg-client-bot \
+    --restart on-failure \
     -v "${channel_file_dir}":"/channel_file_dir" \
     app_bot:0.1 \
     --work-dir="/${ARTIFACTS_VOLUME}" \
