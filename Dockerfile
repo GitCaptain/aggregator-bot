@@ -22,4 +22,4 @@ RUN python3 -m pip install -r "/tmp/requirements.txt"
 COPY client /root/client
 
 WORKDIR ${HOME}
-ENTRYPOINT [ "python3", "client/main.py"]
+ENTRYPOINT ["python3", "client/main.py"]

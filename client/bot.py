@@ -194,9 +194,8 @@ class Bot:
         -> list[list[MessageUpd]]:
         """Get messages from channel starting from msg_id"""
         messages = []
-        # fetch all messages (but no more then 3000) if we already have something from this channel,
-        # else fetch 10 latest message (max in one group) only
-        limit = 3000 if msg_id else 10
+        # fetch 10 latest message (max in one group)
+        limit = 10
         last_grouped_id = None
         msg: Message
         async for msg in self.client.iter_messages(channel, limit=limit, min_id=msg_id):
