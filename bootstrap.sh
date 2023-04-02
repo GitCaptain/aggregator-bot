@@ -9,6 +9,7 @@ cat << EOF
         --artifacts-vol     volume name for bot artifacts (default: ${ARTIFACTS_VOLUME})
         --main-channel      channel where to post messages from channels from channel-file
         --image-tag         image tag to pull from docker hub (default: ${IMAGE_TAG})
+        --rebuild           do not pull container, force rebuild it.
 EOF
 }
 
@@ -40,6 +41,10 @@ while (($#)); do
             IMAGE_TAG=${2}
             shift 2
             ;;
+        --rebuild)
+            REBUILD=1;
+            shift
+            ;;
         *)
             help
             exit 1
@@ -53,11 +58,13 @@ done
 echo "> creating docker volume with name: ${ARTIFACTS_VOLUME}"
 docker volume create ${ARTIFACTS_VOLUME}
 
-echo "> trying to pull docker container"
-docker pull justgivemeregisterplease/app_bot:${IMAGE_TAG} || cant_pull=1
+if ! ((REBUILD)); then
+    echo "> trying to pull docker container"
+    docker pull justgivemeregisterplease/app_bot:${IMAGE_TAG} || cant_pull=1
+fi
 
-if ((cant_pull)); then
-    echo "> something goes wrong while pulling container"
+if ((REBUILD)) || ((cant_pull)); then
+    echo "> can't pull container"
     echo "> start docker build"
     docker build --tag app_bot:${IMAGE_TAG} --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
 fi
