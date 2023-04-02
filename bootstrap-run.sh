@@ -8,10 +8,12 @@ cat << EOF
         --channel-file      path to file with tg channels
         --artifacts-vol     volume name for bot artifacts (default: ${ARTIFACTS_VOLUME})
         --main-channel      channel where to post messages from channels from channel-file
+        --image-tag         image tag to pull from docker hub (default: ${IMAGE_TAG})
 EOF
 }
 
 ARTIFACTS_VOLUME="artifacts"
+IMAGE_TAG="latest"
 while (($#)); do
     case $1 in
         --help)
@@ -34,6 +36,10 @@ while (($#)); do
             MAIN_CHANNEL=${2}
             shift 2
             ;;
+        --image-tag)
+            IMAGE_TAG=${2}
+            shift 2
+            ;;
         *)
             help
             exit 1
@@ -47,8 +53,14 @@ done
 echo "> creating docker volume with name: ${ARTIFACTS_VOLUME}"
 docker volume create ${ARTIFACTS_VOLUME}
 
-echo "> start docker build"
-docker build --tag app_bot:0.1 --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
+echo "> trying to pull docker container"
+docker pull justgivemeregisterplease/app_bot:${IMAGE_TAG} || cant_pull=1
+
+if ((cant_pull)); then
+    echo "> something goes wrong while pulling container"
+    echo "> start docker build"
+    docker build --tag app_bot:${IMAGE_TAG} --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
+fi
 
 echo "> stop previous container"
 docker container rm -f tg-client-bot
@@ -64,7 +76,7 @@ docker run \
     --name tg-client-bot \
     --restart on-failure \
     -v "${channel_file_dir}":"/channel_file_dir" \
-    app_bot:0.1 \
+    app_bot:${IMAGE_TAG} \
     --work-dir="/${ARTIFACTS_VOLUME}" \
     --api-id="$(cat ${SECRET_DIR}/api_id)" \
     --api-hash="$(cat ${SECRET_DIR}/api_hash)" \
