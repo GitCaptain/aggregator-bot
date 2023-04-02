@@ -56,27 +56,17 @@ class MessageUpd:
     # pylint: disable=too-few-public-methods
 
     def __init__(self, msg_id: int, msg_gruop_id: Optional[int], channel_id: int,
-                 text: Optional[str], media: Optional[TypeMessageMedia], is_url: bool):
+                 text: Optional[str], media_ref: Optional[TypeMessageMedia], media_bytes: bytes,
+                 is_url: bool):
+        # media_ref is internal telethon structure used to forward media.
+        # media_bytes - downloaded media as bytes to calculate hash
         self.msg_id = msg_id
         self.group_id = msg_gruop_id
         self.channel_id = channel_id
         self.text = text
-        self.media = media
+        self.media_ref = media_ref
         self.url = is_url
-        try:
-            self.sha256 = self._calc_hash()
-        except Exception as e:
-            raise ValueError from e
-
-    def _calc_hash(self) -> bytes:
-        """Calculate hash for given media for future store/check if exist"""
-        # not sure if this is what I need to save
-        # https://core.telegram.org/api/file_reference
-        if isinstance(self.media, MessageMediaPhoto):
-            file_ref = self.media.photo.file_reference
-        else:
-            file_ref = self.media.document.file_reference
-        return sha256(file_ref).digest()
+        self.sha256 = sha256(media_bytes).digest()
 
     def __repr__(self) -> str:
         return f'<MessageUPD object, msg_id: {self.msg_id}, channel_id: {self.channel_id}, ' \
@@ -146,7 +136,6 @@ class Bot:
             self.logger.debug('get %s from database', ch_map)
             info[ch_map.id] = [ch_map.username, None]
         msg: MessageMapping
-        # TODO: if channel deleted from file: info[msg.channel_id] will raise KeyError
         for msg in msgs:
             self.logger.debug('get %s from database', msg)
             if info.get(msg.channel_id) and \
@@ -209,7 +198,8 @@ class Bot:
                 messages.append([])
             try:
                 urls = msg.get_entities_text(MessageEntityTextUrl)
-                m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media,
+                media_b: bytes = await msg.download_media()
+                m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media, media_b,
                                    bool(urls))
                 messages[-1].append(m_upd)
             except ValueError as v:
@@ -253,7 +243,7 @@ class Bot:
             for msg in msg_group[::-1]:
                 text = msg.text or text
                 url = msg.url or url
-                files.append(msg.media)
+                files.append(msg.media_ref)
             if not self._is_text_ok(text, url):
                 # do not post this message, but save it to db to filter it out on the previous step.
                 continue
