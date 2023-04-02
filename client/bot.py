@@ -198,7 +198,7 @@ class Bot:
                 messages.append([])
             try:
                 urls = msg.get_entities_text(MessageEntityTextUrl)
-                media_b: bytes = await msg.download_media()
+                media_b: bytes = await msg.download_media(file=bytes)
                 m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media, media_b,
                                    bool(urls))
                 messages[-1].append(m_upd)
