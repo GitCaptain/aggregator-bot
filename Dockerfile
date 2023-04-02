@@ -17,6 +17,7 @@ USER root
 ENV HOME=/root
 ENV PATH="${HOME}/.cargo/bin:${PATH}"
 RUN python3 -m pip install -r "/tmp/requirements.txt"
+ARG VERSION=0.1
 COPY client /root/client
 
 WORKDIR ${HOME}
