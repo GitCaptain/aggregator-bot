@@ -1,7 +1,5 @@
 FROM alpine:3.14
 
-ARG ARTIFACT_DIR
-
 COPY requirements.txt /tmp
 
 RUN apk add --no-cache \
