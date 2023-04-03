@@ -24,7 +24,6 @@ from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from telethon.tl.types import (
     MessageEntityTextUrl,
-    MessageMediaPhoto,
     TypeChat,
     TypeMessageMedia,
     Updates,
@@ -67,6 +66,13 @@ class MessageUpd:
         self.media_ref = media_ref
         self.url = is_url
         self.sha256 = sha256(media_bytes).digest()
+
+    def _calc_hash(data: bytes) -> bytes:
+        # sometimes data is not bytes,
+        # TODO: figure out what is wrong
+        if isinstance(data, bytes):
+            return sha256(data).digest()
+        raise ValueError(f'data is not bytes, data is: {data}')
 
     def __repr__(self) -> str:
         return f'<MessageUPD object, msg_id: {self.msg_id}, channel_id: {self.channel_id}, ' \
@@ -203,7 +209,7 @@ class Bot:
                                    bool(urls))
                 messages[-1].append(m_upd)
             except ValueError as v:
-                self.logger.error('Unknown message media type: %s, err: %s', type(msg.media), v)
+                self.logger.error("Can't create MessageUpd, err: %s", v)
         return messages
 
     def _get_posted(self, hashes: Iterable[bytes], db_session: Session) -> set[bytes]:
