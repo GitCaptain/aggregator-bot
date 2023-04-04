@@ -76,8 +76,6 @@ echo "> run docker container"
 channel_file_dir="$(dirname ${CHANNEL_FILE})"
 channel_file_name="$(basename ${CHANNEL_FILE})"
 (set -x; docker run \
-    --tty \
-    --interactive \
     --network host \
     --mount source="${ARTIFACTS_VOLUME}",target="/${ARTIFACTS_VOLUME}" \
     --name tg-client-bot \
