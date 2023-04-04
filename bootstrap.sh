@@ -75,13 +75,13 @@ docker container rm -f tg-client-bot
 echo "> run docker container"
 channel_file_dir="$(dirname ${CHANNEL_FILE})"
 channel_file_name="$(basename ${CHANNEL_FILE})"
-docker run \
+(set -x; docker run \
     --tty \
     --interactive \
     --network host \
     --mount source="${ARTIFACTS_VOLUME}",target="/${ARTIFACTS_VOLUME}" \
     --name tg-client-bot \
-    --restart on-failure \
+    --restart always \
     -v "${channel_file_dir}":"/channel_file_dir" \
     app_bot:${IMAGE_TAG} \
     --work-dir="/${ARTIFACTS_VOLUME}" \
@@ -90,4 +90,4 @@ docker run \
     --channel-file="/channel_file_dir/${channel_file_name}" \
     --main-channel="${MAIN_CHANNEL}" \
     --session-name="anon" \
-    --log-file="app.log"
+    --log-file="app.log" )
