@@ -46,7 +46,10 @@ def setup_logging(logger: logging.Logger, filepath: str) -> None:
 
     # set telethon logger
     telethonlog = logging.getLogger('telethon')
-    telethonlog.addHandler(dbg_fh)
+    telethon_hndl = logging.FileHandler(f'{filepath}.telethon.full')
+    telethon_hndl.setLevel(logging.DEBUG)
+    telethon_hndl.setFormatter(dbg_formatter)
+    telethonlog.addHandler(telethon_hndl)
 
 def main() -> None:
     """program entrypoint"""
