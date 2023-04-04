@@ -22,12 +22,7 @@ from telethon.errors import (
 from telethon.tl.custom.message import Message
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from telethon.tl.types import (
-    MessageEntityTextUrl,
-    TypeChat,
-    TypeMessageMedia,
-    Updates,
-)
+from telethon.tl.types import MessageEntityTextUrl, TypeChat, TypeMessageMedia, Updates
 
 
 class ChannelUpd:
@@ -65,9 +60,9 @@ class MessageUpd:
         self.text = text
         self.media_ref = media_ref
         self.url = is_url
-        self.sha256 = sha256(media_bytes).digest()
+        self.sha256 = self._calc_hash(media_bytes)
 
-    def _calc_hash(data: bytes) -> bytes:
+    def _calc_hash(self, data: bytes) -> bytes:
         # sometimes data is not bytes,
         # TODO: figure out what is wrong
         if isinstance(data, bytes):
