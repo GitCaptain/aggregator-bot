@@ -177,6 +177,7 @@ class Bot:
                 await self._post_messages(messages, db_session)
                 self.save_info(db_session, new_channels, messages)
                 db_session.commit()
+            # TODO: rewrite with events
             self.logger.debug('sleep %ss', sleep_time)
             await asyncio.sleep(sleep_time)
 
@@ -252,6 +253,8 @@ class Bot:
                 await self.client.send_file(self.main_channel, files, caption=text)
             except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
                 self.logger.error("Can't send media: %s", err)
+            except Exception as err: # something wrong, but I don't want to die here
+                self.logger.error("Unexpected exception durung message posting: %s", err)
 
     async def _enumerate_channels(self) -> list[TypeChat]:
         """Get already subscribed channels"""
