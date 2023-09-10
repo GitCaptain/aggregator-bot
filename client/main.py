@@ -23,26 +23,34 @@ def get_argparser() -> argparse.ArgumentParser:
 def setup_logging(logger: logging.Logger, filepath: str) -> None:
     """Setup logger handlers"""
 
-    # TODO: add handler to send error to user
     fh = logging.FileHandler(filepath)
     dbg_fh = logging.FileHandler(f'{filepath}.full')
     sh = logging.StreamHandler()
+    # TODO: Make this handler send error to user
+    error = logging.FileHandler(f'{filepath}.error')
 
     fh.setLevel(logging.INFO)
     dbg_fh.setLevel(logging.DEBUG)
     sh.setLevel(logging.INFO)
+    error.setLevel(logging.ERROR)
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s: %(message)s')
     dbg_formatter = logging.Formatter(
                             '%(asctime)s - %(levelname)s - %(module)s - %(funcName)s: %(message)s')
+    err_formatter = logging.Formatter(
+                            '%(asctime)s - %(levelname)s - '
+                            'module: %(module)s, function: %(funcName)s, line: %(lineno)d:\n'
+                            '%(message)s') # maximum info here
     fh.setFormatter(formatter)
     dbg_fh.setFormatter(dbg_formatter)
     sh.setFormatter(formatter)
+    error.setFormatter(err_formatter)
 
     logging.basicConfig(level=logging.DEBUG, handlers=[fh, sh])
 
     # set app logger
     logger.addHandler(dbg_fh)
+    logger.addHandler(error)
 
     # set telethon logger
     telethonlog = logging.getLogger('telethon')
