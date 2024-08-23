@@ -1,0 +1,58 @@
+#!/bin/sh
+
+if git rev-parse --verify HEAD >/dev/null 2>&1
+then
+	against=HEAD
+else
+	# Initial commit: diff against an empty tree object
+	against=$(git hash-object -t tree /dev/null)
+fi
+
+# If you want to allow non-ASCII filenames set this variable to true.
+allownonascii=$(git config --bool hooks.allownonascii)
+
+# Redirect output to stderr.
+exec 1>&2
+
+# Cross platform projects tend to avoid non-ASCII filenames; prevent
+# them from being added to the repository. We exploit the fact that the
+# printable range starts at the space character and ends with tilde.
+if [ "$allownonascii" != "true" ] &&
+	# Note that the use of brackets around a tr range is ok here, (it's
+	# even required, for portability to Solaris 10's /usr/bin/tr), since
+	# the square bracket bytes happen to fall in the designated range.
+	test $(git diff --cached --name-only --diff-filter=A -z $against |
+	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
+then
+	cat <<EOF
+Error: Attempt to add a non-ASCII file name.
+
+This can cause problems if you want to work with people on other platforms.
+
+To be portable it is advisable to rename the file.
+
+If you know what you are doing you can disable this check using:
+
+  git config hooks.allownonascii true
+EOF
+	exit 1
+fi
+
+# If there are whitespace errors, print the offending file names and fail.
+git diff-index --check --cached $against --
+
+changed_python_files="$(git diff ${against} --name-only | grep ".py")"
+
+if [ -z "${changed_python_files}" ]; then echo "python files not changed, skip checks."; exit 0; fi
+
+echo -n "run mypy before commit: "
+MYPY_LOG="mypy.log"
+mypy ${changed_python_files} 1>"${MYPY_LOG}" 2>&1 && echo ok || mypy_failed=1
+if [ -n "${mypy_failed}" ]; then echo "mypy failed, see ${MYPY_LOG} for more info"; fi
+
+echo -n "run pylint before commit: "
+PYLINT_LOG="pylint.log"
+pylint ${changed_python_files} 1>"${PYLINT_LOG}" 2>&1 && echo ok || pylint_failed=1
+if [ -n "${pylint_failed}" ]; then echo "pylint failed, see ${PYLINT_LOG} for more info"; fi
+
+exit $((pylint_failed + mypy_failed))
