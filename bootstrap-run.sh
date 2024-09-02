@@ -3,16 +3,18 @@ function help() {
 cat << EOF
     Usage: ./$(basename $0) Options...
     Options:
-        --help              print this help and exit
-        --secret-dir        path/to/directory with api_hash and api_id files
-        --channel-file      path to file with tg channels
-        --artifacts-vol     volume name for bot artifacts (default: ${ARTIFACTS_VOLUME})
-        --main-channel      channel where to post messages from channels from channel-file
-        --image-tag         image tag to pull from docker hub (default: ${IMAGE_TAG})
-        --rebuild           do not pull container, force rebuild it.
+        --help              Print this help and exit
+        --secret-dir        Path/to/directory with api_hash and api_id files
+        --channel-file      Path to file with tg channels
+        --artifacts-vol     Volume name for bot artifacts (default: ${ARTIFACTS_VOLUME})
+        --main-channel      Channel where to post messages from channels from channel-file
+        --container-name    Container name to run (default: ${CONTAINER_NAME})
+        --image-tag         Image tag to pull from docker hub (default: ${IMAGE_TAG})
+        --rebuild           Do not pull container, force rebuild it.
 EOF
 }
 
+CONTAINER_NAME="app_bot"
 ARTIFACTS_VOLUME="artifacts"
 IMAGE_TAG="latest"
 while (($#)); do
@@ -45,6 +47,10 @@ while (($#)); do
             REBUILD=1;
             shift
             ;;
+        --container-name)
+            CONTAINER_NAME=${2};
+            shift 2
+            ;;
         *)
             help
             exit 1
@@ -76,12 +82,15 @@ echo "> run docker container"
 channel_file_dir="$(dirname ${CHANNEL_FILE})"
 channel_file_name="$(basename ${CHANNEL_FILE})"
 (set -x; docker run \
+    --tty \
+    --interactive \
+    --detach \
     --network host \
     --mount source="${ARTIFACTS_VOLUME}",target="/${ARTIFACTS_VOLUME}" \
     --name tg-client-bot \
     --restart always \
     -v "${channel_file_dir}":"/channel_file_dir" \
-    app_bot:${IMAGE_TAG} \
+    ${CONTAINER_NAME}:${IMAGE_TAG} \
     --work-dir="/${ARTIFACTS_VOLUME}" \
     --api-id="$(cat ${SECRET_DIR}/api_id)" \
     --api-hash="$(cat ${SECRET_DIR}/api_hash)" \
