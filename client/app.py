@@ -21,13 +21,16 @@ class App:
         self.logger.info('App started')
         session = os.path.join(self.working_dir, session_name)
         with TelegramClient(session, int(self.api_id), self.api_hash) as client:
-            try:
-                client.loop.run_until_complete(
-                    Bot(self, client, Database(self.database_path), FileProcessor(channel_file))
-                                                .start(main_channel))
-            except Exception as e:
-                self.logger.error('Unhandled exception: %s', e)
-                sys.exit(1)
+            while True:
+                try:
+                    client.loop.run_until_complete(
+                        Bot(self,
+                            client,
+                            Database(self.database_path),
+                            FileProcessor(channel_file))
+                                .start(main_channel))
+                except Exception as e:
+                    self.logger.error('Unhandled exception: %s', e)
 
     @property
     def database_path(self) -> str:
