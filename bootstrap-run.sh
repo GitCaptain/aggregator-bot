@@ -72,7 +72,7 @@ fi
 if ((REBUILD)) || ((cant_pull)); then
     echo "> can't pull container"
     echo "> start docker build"
-    docker build --tag app_bot:${IMAGE_TAG} --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
+    docker build --tag ${CONTAINER_NAME}:${IMAGE_TAG} --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
 fi
 
 echo "> stop previous container"
