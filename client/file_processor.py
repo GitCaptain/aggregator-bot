@@ -18,7 +18,7 @@ class FileProcessor:
             with open(self.file, encoding='utf-8') as channels:
                 for channel in channels:
                     channel = channel.strip()
-                    self.logger.info('channel parsed: %s', channel)
+                    self.logger.debug('channel parsed: %s', channel)
                     if channel.startswith('#'):
                         self.logger.debug('skip current channel')
                         continue

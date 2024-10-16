@@ -16,7 +16,7 @@ from telethon.errors import (
 )
 from telethon.events.common import EventBuilder
 from telethon.functions import messages
-from telethon.tl import types
+from telethon.tl import custom, types
 from telethon.tl.functions.channels import JoinChannelRequest
 
 
@@ -40,20 +40,34 @@ class Bot:
         # pylint: disable=invalid-name
         self.me = None
 
-    async def onNewMessage(self, event: events.NewMessage):
+    async def onNewMessage(self, event: events.NewMessage.Event) -> None:
         self.logger.info(
-            'Got new message %s\ntype: %s\ndata: %s',
-            event,
-            type(event),
+            'Got new message %s\ntype: %s',
             event.stringify(),
+            type(event),
         )
+        msg: custom.Message = event.message
+        media = msg.media
+        if media is None:
+            self.logger.debug('Skip message: No media')
+            return
+        if not isinstance(media, (
+                        types.MessageMediaPhoto, types.MessageMediaDocument)):
+            self.logger.debug('Skip message: media type %s not intresting',
+                                type(media))
+            return
+        urls = msg.get_entities_text(types.MessageEntityTextUrl)
+        text = msg.text or ''
+        if not self._is_text_ok(text, bool(urls)):
+            self.logger.debug('Skip message, maybe advertisement: %s', text)
+            return
 
-    async def onAnyEvent(self, event: EventBuilder):
+
+    async def onAnyEvent(self, event: EventBuilder) -> None:
         self.logger.debug(
-            'Got new event %s\ntype: %s\ndata: %s',
-            event,
-            type(event),
+            'Got new event %s\ntype: %s',
             event.stringify(),
+            type(event),
         )
 
     def register_handlers(self):
@@ -114,7 +128,14 @@ class Bot:
         return meme_folder_id
 
     async def get_subscribed_channels(self) -> set[str]:
-        return set()
+        # TODO: iter only in meme folder?
+        subscribed = set()
+        dialog: custom.dialog.Dialog
+        async for dialog in self.client.iter_dialogs():
+            self.logger.debug('Found dialog: %s\n\ttype: %s', dialog, type(dialog))
+            if dialog.is_channel:
+                subscribed.add(dialog)
+        return subscribed
 
     async def _main(self) -> None:
         """main program loop: subscribe, restore info, get content,
@@ -163,18 +184,18 @@ class Bot:
     #             self.logger.error('Can't create MessageUpd, err: %s', v)
     #     return messages
 
-    # def _is_text_ok(self, msg_text: str, url: bool):
-    #     """Do my best to filter out messages"""
-    #     if url:
-    #         # probably some advertisement link
-    #         return False
-    #     if len(msg_text) > 50:
-    #         # too long for meme
-    #         return False
-    #     if '#' in msg_text:
-    #         # probably some #adv tag
-    #         return False
-    #     return True
+    def _is_text_ok(self, msg_text: str, url: bool):
+        """Do my best to filter out messages"""
+        if url:
+            # probably some advertisement link
+            return False
+        if len(msg_text) > 50:
+            # too long for meme
+            return False
+        if '#' in msg_text:
+            # probably some #adv tag
+            return False
+        return True
 
     # async def _post_messages(self, messages: list[list[MessageUpd]], db_session: Session) -> None:
     #     """Post messages to main_channel"""
@@ -260,10 +281,14 @@ class Bot:
         err_msg = 'Unable to join channel: %s, reason: %s'
         # TODO: Mute and archive all chats
         futures: list[Coroutine[Any, Any, types.Updates]] = []
+        # TODO: subscribe asyncronously
+        # TODO: move sucscribed chat to meme folder
         for channel in channels:
             info = f'{channel.title} (@{channel.username})'
             if channel.username in subscribed:
-                futures.append(self.client.edit_folder(channel, 1))
+                if meme_folder_id >= 0:
+                    futures.append(
+                        self.client.edit_folder(channel, meme_folder_id))
                 self.logger.debug('skip channel %s, already subscribed', info)
                 continue
             try:
@@ -274,11 +299,11 @@ class Bot:
                     )
                     continue
                 ic = types.InputChannel(channel.id, channel.access_hash)
-                result = await self.client(JoinChannelRequest(ic))
-                # WTF IS RESULT??
-                self.logger.info(
+                result: types.Updates = await self.client( # type: ignore
+                                            JoinChannelRequest(ic))
+                self.logger.debug(
                     'Joining channel result:\n\tres: %s\n\ttype: %s',
-                    result,
+                    result.stringify(),
                     type(result),
                 )
                 # self.logger.info('Join channel request result: %s', result.stringify())
@@ -312,3 +337,4 @@ class Bot:
                     'You have successfully requested to join this chat or '
                     'channel.'
                 )
+        asyncio.gather(*futures)
