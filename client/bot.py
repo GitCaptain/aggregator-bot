@@ -68,16 +68,37 @@ class Bot:
         self.main_channel = await self.client.get_entity(main_channel_input_entt)
         await self._main()
 
+    async def get_meme_folder_id(self) -> int:
+        folders: types.messages.DialogFilters = await self.client(messages.GetDialogFiltersRequest()) # type: ignore
+        self.logger.debug('Enumerated folders: %s\ntype: %s', folders.stringify(), type(folders))
+        for e in folders.filters:
+            self.logger.debug('folder: %s\ntype: %s', e.stringify(), type(e))
+        try:
+            meme_folder_id = next( # we only check one for now
+                filter(
+                    lambda x: isinstance(x, types.DialogFilter)
+                    and x.title == self.memes_folder,
+                    folders.filters)).id
+        except StopIteration:
+            self.logger.warning('Folder with name %s not found!',
+                                self.memes_folder)
+            return -1
+        self.logger.debug('Meme folder id: %s', meme_folder_id)
+        return meme_folder_id
+
     async def get_subscribed_channels(self) -> set[str]:
         return set()
 
     async def _main(self) -> None:
         """main program loop: subscribe, restore info, get content, send content, save content"""
 
-        channels, subscribed = await asyncio.gather(self._enumerate_channels(), self.get_subscribed_channels())
+        channels, subscribed, meme_folder_id = await asyncio.gather(
+            self._enumerate_channels(),
+            self.get_subscribed_channels(),
+            self.get_meme_folder_id())
         usernames = set(channel.username for channel in channels)
         self.channels = usernames
-        await self._subscribe_channels(channels, subscribed)
+        await self._subscribe_channels(channels, subscribed, meme_folder_id)
         await asyncio.Future()
         # messages = []
         # for ch_info in channels:
@@ -193,16 +214,11 @@ class Bot:
         self.logger.info('Channels enumerated: %s', list(channel.username for channel in channels))
         return channels
 
-    async def _subscribe_channels(self, channels: list[types.Channel], subscribed: set[str|None]) -> None:
+    async def _subscribe_channels(self, channels: list[types.Channel], subscribed: set[str], meme_folder_id: int) -> None:
         """Subscribe to channels"""
         err_msg = 'Unable to join channel: %s, reason: %s'
         # TODO: Mute and archive all chats
         futures: list[Coroutine[Any, Any, types.Updates]] = []
-        folders: types.messages.DialogFilters = await self.client(messages.GetDialogFiltersRequest()) # type: ignore
-        self.logger.debug('Enumerated folders: %s\ntype: %s', folders.stringify(), type(folders))
-        for e in folders.filters:
-            self.logger.debug('folder: %s\ntype: %s', e.stringify(), type(e))
-        meme_folders = [folder for folder in folders.filters if isinstance(folder, types.DialogFilter) and folder.title == self.memes_folder]
         for channel in channels:
             info = f'{channel.title} (@{channel.username})'
             if channel.username in subscribed:
