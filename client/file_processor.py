@@ -25,7 +25,8 @@ class FileProcessor:
                     yield channel
         except FileNotFoundError:
             # we do not want to shutdown bot if nothing found
-            # file may be created on next call to this function or we already read what we need.
+            # file may be created on next call to this function
+            # or we already read what we need.
             self.logger.error(
                 'File %s not found, create file or check path', self.file
             )

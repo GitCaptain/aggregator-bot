@@ -88,7 +88,8 @@ class Bot:
         await self._main()
 
     async def get_meme_folder_id(self) -> int:
-        folders: types.messages.DialogFilters = await self.client(messages.GetDialogFiltersRequest())  # type: ignore
+        folders: types.messages.DialogFilters = await self.client(
+            messages.GetDialogFiltersRequest())  # type: ignore
         self.logger.debug(
             'Enumerated folders: %s\ntype: %s',
             folders.stringify(),
@@ -116,7 +117,8 @@ class Bot:
         return set()
 
     async def _main(self) -> None:
-        """main program loop: subscribe, restore info, get content, send content, save content"""
+        """main program loop: subscribe, restore info, get content,
+        send content, save content"""
 
         channels, subscribed, meme_folder_id = await asyncio.gather(
             self._enumerate_channels(),
@@ -230,7 +232,7 @@ class Bot:
                 channel = await self.client.get_entity(ent)
                 if not isinstance(channel, types.Channel):
                     self.logger.warning(
-                        'Expected %s to be a Channel, but it's type is: %s',
+                        "Expected %s to be a Channel, but it's type is: %s",
                         channel_uname,
                         type(channel),
                     )
@@ -238,7 +240,7 @@ class Bot:
                     channels.append(channel)
             except (ValueError, TypeError) as e:
                 self.logger.warning(
-                    'Can't find input_entity for channel: %s\nGot err: %s',
+                    "Can't find input_entity for channel: %s\nGot err: %s",
                     channel_uname,
                     e,
                 )
@@ -291,19 +293,22 @@ class Bot:
                     err_msg,
                     info,
                     'Invalid channel object. '
-                    'Make sure to pass the right types, for instance making sure that the request '
-                    'is designed for channels or otherwise look for a different one more suited.',
+                    'Make sure to pass the right types, for instance making '
+                    'sure that the request is designed for channels or '
+                    'otherwise look for a different one more suited.',
                 )
             except ChannelPrivateError:
                 self.logger.error(
                     err_msg,
                     info,
-                    'The channel specified is private and you lack permission to access it. '
-                    'Another reason may be that you were banned from it.',
+                    'The channel specified is private and you lack permission '
+                    'to access it. Another reason may be that you were banned '
+                    'from it.',
                 )
             except InviteRequestSentError:
                 # Not sure what this error means, taken from docs
                 # https://tl.telethon.dev/methods/channels/join_channel.html
                 self.logger.error(
-                    'You have successfully requested to join this chat or channel.'
+                    'You have successfully requested to join this chat or '
+                    'channel.'
                 )
