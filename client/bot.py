@@ -25,7 +25,7 @@ class Bot:
 
     def __init__(
         self,
-        owner: "app.App",
+        owner: 'app.App',
         client: telethon.TelegramClient,
         file_processor: FileProcessor,
         memes_folder: str,
@@ -33,7 +33,7 @@ class Bot:
         self.client = client
         self.file_processor = file_processor
         self.owner = owner
-        self.logger = logging.getLogger("Main.bot")
+        self.logger = logging.getLogger('Main.bot')
         self.main_channel = None
         self.channels = None
         self.memes_folder = memes_folder
@@ -42,7 +42,7 @@ class Bot:
 
     async def onNewMessage(self, event: events.NewMessage):
         self.logger.info(
-            "Got new message %s\ntype: %s\ndata: %s",
+            'Got new message %s\ntype: %s\ndata: %s',
             event,
             type(event),
             event.stringify(),
@@ -50,7 +50,7 @@ class Bot:
 
     async def onAnyEvent(self, event: EventBuilder):
         self.logger.debug(
-            "Got new event %s\ntype: %s\ndata: %s",
+            'Got new event %s\ntype: %s\ndata: %s',
             event,
             type(event),
             event.stringify(),
@@ -75,9 +75,9 @@ class Bot:
 
     async def start(self, main_channel: str) -> None:
         """Bot entrypoint"""
-        self.logger.info("bot started")
+        self.logger.info('bot started')
         self.logger.debug(
-            "signed in as: %s", (await self.client.get_me()).stringify()
+            'signed in as: %s', (await self.client.get_me()).stringify()
         )
         main_channel_input_entt = await self.client.get_input_entity(
             main_channel
@@ -90,12 +90,12 @@ class Bot:
     async def get_meme_folder_id(self) -> int:
         folders: types.messages.DialogFilters = await self.client(messages.GetDialogFiltersRequest())  # type: ignore
         self.logger.debug(
-            "Enumerated folders: %s\ntype: %s",
+            'Enumerated folders: %s\ntype: %s',
             folders.stringify(),
             type(folders),
         )
         for e in folders.filters:
-            self.logger.debug("folder: %s\ntype: %s", e.stringify(), type(e))
+            self.logger.debug('folder: %s\ntype: %s', e.stringify(), type(e))
         try:
             meme_folder_id = next(  # we only check one for now
                 filter(
@@ -106,10 +106,10 @@ class Bot:
             ).id
         except StopIteration:
             self.logger.warning(
-                "Folder with name %s not found!", self.memes_folder
+                'Folder with name %s not found!', self.memes_folder
             )
             return -1
-        self.logger.debug("Meme folder id: %s", meme_folder_id)
+        self.logger.debug('Meme folder id: %s', meme_folder_id)
         return meme_folder_id
 
     async def get_subscribed_channels(self) -> set[str]:
@@ -158,7 +158,7 @@ class Bot:
     #                                bool(urls))
     #             messages[-1].append(m_upd)
     #         except ValueError as v:
-    #             self.logger.error("Can't create MessageUpd, err: %s", v)
+    #             self.logger.error('Can't create MessageUpd, err: %s', v)
     #     return messages
 
     # def _is_text_ok(self, msg_text: str, url: bool):
@@ -198,9 +198,9 @@ class Bot:
     #         try:
     #             await self.client.send_file(self.main_channel, files, caption=text)
     #         except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
-    #             self.logger.error("Can't send media: %s", err)
+    #             self.logger.error('Can't send media: %s', err)
     #         except Exception as err: # something wrong, but I don't want to die here
-    #             self.logger.error("Unexpected exception durung message posting: %s", err)
+    #             self.logger.error('Unexpected exception durung message posting: %s', err)
 
     async def _enumerate_channels(self) -> list[types.Channel]:
         """Get already subscribed channels"""
@@ -230,7 +230,7 @@ class Bot:
                 channel = await self.client.get_entity(ent)
                 if not isinstance(channel, types.Channel):
                     self.logger.warning(
-                        "Expected %s to be a Channel, but it's type is: %s",
+                        'Expected %s to be a Channel, but it's type is: %s',
                         channel_uname,
                         type(channel),
                     )
@@ -238,12 +238,12 @@ class Bot:
                     channels.append(channel)
             except (ValueError, TypeError) as e:
                 self.logger.warning(
-                    "Can't find input_entity for channel: %s\nGot err: %s",
+                    'Can't find input_entity for channel: %s\nGot err: %s',
                     channel_uname,
                     e,
                 )
         self.logger.info(
-            "Channels enumerated: %s",
+            'Channels enumerated: %s',
             list(channel.username for channel in channels),
         )
         return channels
@@ -255,19 +255,19 @@ class Bot:
         meme_folder_id: int,
     ) -> None:
         """Subscribe to channels"""
-        err_msg = "Unable to join channel: %s, reason: %s"
+        err_msg = 'Unable to join channel: %s, reason: %s'
         # TODO: Mute and archive all chats
         futures: list[Coroutine[Any, Any, types.Updates]] = []
         for channel in channels:
-            info = f"{channel.title} (@{channel.username})"
+            info = f'{channel.title} (@{channel.username})'
             if channel.username in subscribed:
                 futures.append(self.client.edit_folder(channel, 1))
-                self.logger.debug("skip channel %s, already subscribed", info)
+                self.logger.debug('skip channel %s, already subscribed', info)
                 continue
             try:
                 if channel.access_hash is None:
                     self.logger.warning(
-                        "access_hash field is expected, but not set for: %s",
+                        'access_hash field is expected, but not set for: %s',
                         info,
                     )
                     continue
@@ -275,7 +275,7 @@ class Bot:
                 result = await self.client(JoinChannelRequest(ic))
                 # WTF IS RESULT??
                 self.logger.info(
-                    "Joining channel result:\n\tres: %s\n\ttype: %s",
+                    'Joining channel result:\n\tres: %s\n\ttype: %s',
                     result,
                     type(result),
                 )
@@ -284,26 +284,26 @@ class Bot:
                 self.logger.error(
                     err_msg,
                     info,
-                    "You have joined too many channels/supergroups.",
+                    'You have joined too many channels/supergroups.',
                 )
             except ChannelIdInvalidError:
                 self.logger.error(
                     err_msg,
                     info,
-                    "Invalid channel object. "
-                    "Make sure to pass the right types, for instance making sure that the request "
-                    "is designed for channels or otherwise look for a different one more suited.",
+                    'Invalid channel object. '
+                    'Make sure to pass the right types, for instance making sure that the request '
+                    'is designed for channels or otherwise look for a different one more suited.',
                 )
             except ChannelPrivateError:
                 self.logger.error(
                     err_msg,
                     info,
-                    "The channel specified is private and you lack permission to access it. "
-                    "Another reason may be that you were banned from it.",
+                    'The channel specified is private and you lack permission to access it. '
+                    'Another reason may be that you were banned from it.',
                 )
             except InviteRequestSentError:
                 # Not sure what this error means, taken from docs
                 # https://tl.telethon.dev/methods/channels/join_channel.html
                 self.logger.error(
-                    "You have successfully requested to join this chat or channel."
+                    'You have successfully requested to join this chat or channel.'
                 )

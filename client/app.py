@@ -12,7 +12,7 @@ class App:
     def __init__(self, api_id: str, api_hash: str, work_dir: str) -> None:
         self.api_id = api_id
         self.api_hash = api_hash
-        self.logger = logging.getLogger("Main.app")
+        self.logger = logging.getLogger('Main.app')
         self.working_dir = work_dir
         os.makedirs(self.working_dir, exist_ok=True)
 
@@ -23,7 +23,7 @@ class App:
         channel_file: str,
         memes_folder: str,
     ) -> None:
-        self.logger.info("App started")
+        self.logger.info('App started')
         session = os.path.join(self.working_dir, session_name)
         with TelegramClient(session, int(self.api_id), self.api_hash) as client:
             bot = Bot(self, client, FileProcessor(channel_file), memes_folder)
@@ -32,7 +32,7 @@ class App:
                 try:
                     client.loop.run_until_complete(bot.start(main_channel))
                 except Exception as e:
-                    self.logger.error("Unhandled exception: %s", e)
+                    self.logger.error('Unhandled exception: %s', e)
 
     @property
     def working_dir(self) -> str:
