@@ -41,8 +41,7 @@ fi
 # If there are whitespace errors, print the offending file names and fail.
 git diff-index --check --cached $against --
 
-changed_python_files="$(git diff ${against} --name-only | grep ".py")"
-
+changed_python_files="$(git diff ${against} --name-only | grep "\.py$")"
 if [ -z "${changed_python_files}" ]; then echo "python files not changed, skip checks."; exit 0; fi
 
 echo -n "run mypy before commit: "
