@@ -14,9 +14,8 @@ from telethon.errors import (
     ChannelsTooMuchError,
     InviteRequestSentError,
 )
-from telethon.events.common import EventBuilder
 from telethon.functions import messages
-from telethon.tl import custom, types
+from telethon.tl import TLObject, custom, types
 from telethon.tl.functions.channels import JoinChannelRequest
 
 
@@ -41,7 +40,7 @@ class Bot:
         self.me = None
 
     async def onNewMessage(self, event: events.NewMessage.Event) -> None:
-        self.logger.info(
+        self.logger.debug(
             'Got new message %s\ntype: %s',
             event.stringify(),
             type(event),
@@ -49,25 +48,25 @@ class Bot:
         msg: custom.Message = event.message
         media = msg.media
         if media is None:
-            self.logger.debug('Skip message: No media')
+            self.logger.info('Skip message: No media')
             return
         if not isinstance(media, (
                         types.MessageMediaPhoto, types.MessageMediaDocument)):
-            self.logger.debug('Skip message: media type %s not intresting',
+            self.logger.info('Skip message: media type %s not intresting',
                                 type(media))
             return
         urls = msg.get_entities_text(types.MessageEntityTextUrl)
         text = msg.text or ''
         if not self._is_text_ok(text, bool(urls)):
-            self.logger.debug('Skip message, maybe advertisement: %s', text)
+            self.logger.info('Skip message, maybe advertisement: %s', text)
             return
 
 
-    async def onAnyEvent(self, event: EventBuilder) -> None:
+    async def onAnyEvent(self, event: TLObject) -> None:
         self.logger.debug(
-            'Got new event %s\ntype: %s',
+            'Got new event %s\ntype: %s\n',
             event.stringify(),
-            type(event),
+            type(event)
         )
 
     def register_handlers(self):
@@ -112,13 +111,15 @@ class Bot:
         for e in folders.filters:
             self.logger.debug('folder: %s\ntype: %s', e.stringify(), type(e))
         try:
-            meme_folder_id = next(  # we only check one for now
+            meme_folder_id: int = next(
+                # we only check one for now
                 filter(
-                    lambda x: isinstance(x, types.DialogFilter)
-                    and x.title == self.memes_folder,
+                    lambda x: (isinstance(x, types.DialogFilter)
+                                and x.title == self.memes_folder),
                     folders.filters,
                 )
-            ).id
+            #linter can't understand "isinstance(x, types.DialogFilter)"
+            ).id # type: ignore
         except StopIteration:
             self.logger.warning(
                 'Folder with name %s not found!', self.memes_folder
