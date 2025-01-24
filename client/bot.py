@@ -151,39 +151,6 @@ class Bot:
         self.channels = usernames
         await self._subscribe_channels(channels, subscribed, meme_folder_id)
         await asyncio.Future()
-        # messages = []
-        # for ch_info in channels:
-        #     messages.extend(await self._get_messages_since_id(ch_info.entt,
-        #                                                         ch_info.latest_saved_msg_id))
-        # await self._post_messages(messages, db_session)
-        # self.save_info(db_session, new_channels, messages)
-
-    # async def _get_messages_since_id(self, channel: TypeChat, msg_id: int = 0) \
-    #     -> list[list[MessageUpd]]:
-    #     """Get messages from channel starting from msg_id"""
-    #     messages = []
-    #     # fetch 10 latest message (max in one group)
-    #     limit = 10
-    #     last_grouped_id = None
-    #     msg: Message
-    #     async for msg in self.client.iter_messages(channel, limit=limit, min_id=msg_id):
-    #         logging.debug('get msg from chat %s, msg:', channel.title)
-    #         logging.debug(msg.stringify())
-    #         if not msg.video and not msg.photo and not msg.gif:
-    #             logging.debug('Msg with id %s: is not photo, video or gif', msg.id)
-    #             continue
-    #         if msg.grouped_id is None or msg.grouped_id != last_grouped_id:
-    #             last_grouped_id = msg.grouped_id
-    #             messages.append([])
-    #         try:
-    #             urls = msg.get_entities_text(MessageEntityTextUrl)
-    #             media_b: bytes = await msg.download_media(file=bytes)
-    #             m_upd = MessageUpd(msg.id, msg.grouped_id, channel.id, msg.text, msg.media, media_b,
-    #                                bool(urls))
-    #             messages[-1].append(m_upd)
-    #         except ValueError as v:
-    #             self.logger.error('Can't create MessageUpd, err: %s', v)
-    #     return messages
 
     def _is_text_ok(self, msg_text: str, url: bool):
         """Do my best to filter out messages"""
