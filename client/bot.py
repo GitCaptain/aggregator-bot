@@ -16,6 +16,7 @@ from telethon.errors import (
 )
 from telethon.functions import messages
 from telethon.tl import TLObject, custom, types
+from telethon.tl.custom import message
 from telethon.tl.functions.channels import JoinChannelRequest
 
 
@@ -57,10 +58,10 @@ class Bot:
             return
         urls = msg.get_entities_text(types.MessageEntityTextUrl)
         text = msg.text or ''
-        if not self._is_text_ok(text, bool(urls)):
+        if not self._is_advertising_probably(text, bool(urls)):
             self.logger.info('Skip message, maybe advertisement: %s', text)
             return
-
+        await self._post_message(event.message)
 
     async def onAnyEvent(self, event: TLObject) -> None:
         self.logger.debug(
@@ -76,7 +77,10 @@ class Bot:
                 incoming=True, forwards=False, from_users=self.channels
             ),
         )
+        # TODO: do we want to check forwarded messages ?
+        self.client.add_event_handler(self.onAnyEvent, events.UserUpdate())
         self.client.add_event_handler(self.onAnyEvent, events.Album())
+
         self.client.add_event_handler(self.onAnyEvent, events.CallbackQuery())
         self.client.add_event_handler(self.onAnyEvent, events.ChatAction())
         self.client.add_event_handler(self.onAnyEvent, events.MessageDeleted())
@@ -84,7 +88,6 @@ class Bot:
         self.client.add_event_handler(self.onAnyEvent, events.MessageEdited())
         self.client.add_event_handler(self.onAnyEvent, events.MessageRead())
         self.client.add_event_handler(self.onAnyEvent, events.Raw())
-        self.client.add_event_handler(self.onAnyEvent, events.UserUpdate())
 
     async def start(self, main_channel: str) -> None:
         """Bot entrypoint"""
@@ -98,6 +101,7 @@ class Bot:
         self.main_channel = await self.client.get_entity(
             main_channel_input_entt
         )
+        assert self.main_channel, "Main channel not found!"
         await self._main()
 
     async def get_meme_folder_id(self) -> int:
@@ -152,7 +156,7 @@ class Bot:
         await self._subscribe_channels(channels, subscribed, meme_folder_id)
         await asyncio.Future()
 
-    def _is_text_ok(self, msg_text: str, url: bool):
+    def _is_advertising_probably(self, msg_text: str, url: bool):
         """Do my best to filter out messages"""
         if url:
             # probably some advertisement link
@@ -165,33 +169,26 @@ class Bot:
             return False
         return True
 
-    # async def _post_messages(self, messages: list[list[MessageUpd]], db_session: Session) -> None:
-    #     """Post messages to main_channel"""
-    #     posted = self._get_posted(map(lambda msg: msg.sha256,
-    #                                   itertools.chain.from_iterable(messages)),
-    #                               db_session)
-    #     # Post in reverse order, since we add latest messages to the end of list
-    #     for msg_group in messages[::-1]:
-    #         # do not post messages if full group posted already
-    #         # if only some messages from the group exist - it may be new meme
-    #         if set(map(lambda msg: msg.sha256, msg_group)).issubset(posted):
-    #             continue
-    #         text = ''
-    #         files = []
-    #         url = False
-    #         for msg in msg_group[::-1]:
-    #             text = msg.text or text
-    #             url = msg.url or url
-    #             files.append(msg.media_ref)
-    #         if not self._is_text_ok(text, url):
-    #             # do not post this message, but save it to db to filter it out on the previous step.
-    #             continue
-    #         try:
-    #             await self.client.send_file(self.main_channel, files, caption=text)
-    #         except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
-    #             self.logger.error('Can't send media: %s', err)
-    #         except Exception as err: # something wrong, but I don't want to die here
-    #             self.logger.error('Unexpected exception durung message posting: %s', err)
+    async def _post_message(self, message: message.Message) -> None:
+        """Post messages to main_channel"""
+        try:
+            sendable_message = types.Message(
+                id=message.id,
+                peer_id=message.peer_id,
+                message=message.message or "",
+                date=message.date,
+                media=message.media
+            )
+            # self.main_channel is not None, we check it at `start`, and it is
+            # not list, since we requested only on Entity there
+            await self.client.send_message(self.main_channel,  # type: ignore
+                                           sendable_message)
+            self.logger.debug('send message:\n%s\n', sendable_message)
+            # await self.client.send_file(self.main_channel, files, caption=text)
+        except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
+            self.logger.error("Can't send media: %s", err)
+        except Exception as err: # something wrong, but I don't want to die here
+            self.logger.error('Unexpected exception during message posting: %s', err)
 
     async def _enumerate_channels(self) -> list[types.Channel]:
         """Get already subscribed channels"""
