@@ -27,7 +27,6 @@ class App:
         session = os.path.join(self.working_dir, session_name)
         with TelegramClient(session, int(self.api_id), self.api_hash) as client:
             bot = Bot(self, client, FileProcessor(channel_file), memes_folder)
-            bot.register_handlers()
             while True:  # never give up!
                 try:
                     client.loop.run_until_complete(bot.start(main_channel))

@@ -42,23 +42,23 @@ class Bot:
     def check_message_intresting(self, message: custom.Message) -> bool:
         media = message.media
         if media is None:
-            self.logger.info('Skip message: No media')
+            self.logger.debug('Skip message: No media')
             return False
         if not isinstance(media, (
                         types.MessageMediaPhoto, types.MessageMediaDocument)):
-            self.logger.info('Skip message: media type %s not intresting',
+            self.logger.debug('Skip message: media type %s not intresting',
                                 type(media))
             return False
         urls = message.get_entities_text(types.MessageEntityTextUrl)
         text = message.text or ''
         if not self._is_advertising_probably(text, bool(urls)):
-            self.logger.info('Skip message, maybe advertisement: %s', text)
+            self.logger.debug('Skip message, maybe advertisement: %s', text)
             return False
 
         return True
 
     async def onNewMessage(self, event: events.NewMessage.Event) -> None:
-        self.logger.info(
+        self.logger.debug(
             'Got new message %s\ntype: %s',
             event.stringify(),
             type(event),
@@ -73,7 +73,7 @@ class Bot:
         await self._post_messages([msg])
 
     async def onAlbum(self, event: events.Album.Event) -> None:
-        self.logger.info(
+        self.logger.debug(
             'Got new Album %s\ntype: %s',
             event.stringify(),
             type(event),
@@ -86,7 +86,7 @@ class Bot:
         await self._post_messages(event.messages, True)
 
     async def onAnyEvent(self, event: TLObject) -> None:
-        self.logger.info(
+        self.logger.debug(
             'Got new event %s\ntype: %s\n',
             event.stringify(),
             type(event)
@@ -117,7 +117,7 @@ class Bot:
     async def start(self, main_channel: str) -> None:
         """Bot entrypoint"""
         self.logger.info('bot started')
-        self.logger.debug(
+        self.logger.info(
             'signed in as: %s', (await self.client.get_me()).stringify()
         )
         main_channel_input_entt = await self.client.get_input_entity(
@@ -154,7 +154,7 @@ class Bot:
                 'Folder with name %s not found!', self.memes_folder
             )
             return -1
-        self.logger.debug('Meme folder id: %s', meme_folder_id)
+        self.logger.info('Meme folder id: %s', meme_folder_id)
         return meme_folder_id
 
     async def get_subscribed_channels(self) -> set[str]:
@@ -178,6 +178,7 @@ class Bot:
         )
         usernames = set(channel.username for channel in channels)
         self.channels = usernames
+        self.register_handlers()
         await self._subscribe_channels(channels, subscribed, meme_folder_id)
         await asyncio.Future()
 
@@ -193,6 +194,12 @@ class Bot:
             # probably some #adv tag
             return False
         return True
+
+    async def _on_success_post(self, messages: list[custom.Message]) -> None:
+        awaitables = []
+        for msg in messages:
+            awaitables.append(msg.mark_read())
+        await asyncio.gather(*awaitables)
 
     async def _post_messages(self, messages: list[custom.Message], is_album=False) -> None:
         """Post messages to main_channel"""
@@ -214,6 +221,7 @@ class Bot:
                 await self.client.send_message(self.main_channel,  # type: ignore
                                             sendable_message)
                 self.logger.debug('send message:\n%s\n', sendable_message)
+            await self._on_success_post(messages)
         except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
             self.logger.error("Can't send media: %s", err)
         except Exception as err: # something wrong, but I don't want to die here
