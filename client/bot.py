@@ -16,7 +16,6 @@ from telethon.errors import (
 )
 from telethon.functions import messages
 from telethon.tl import TLObject, custom, types
-from telethon.tl.custom import message
 from telethon.tl.functions.channels import JoinChannelRequest
 
 
@@ -40,31 +39,54 @@ class Bot:
         # pylint: disable=invalid-name
         self.me = None
 
+    def check_message_intresting(self, message: custom.Message) -> bool:
+        media = message.media
+        if media is None:
+            self.logger.info('Skip message: No media')
+            return False
+        if not isinstance(media, (
+                        types.MessageMediaPhoto, types.MessageMediaDocument)):
+            self.logger.info('Skip message: media type %s not intresting',
+                                type(media))
+            return False
+        urls = message.get_entities_text(types.MessageEntityTextUrl)
+        text = message.text or ''
+        if not self._is_advertising_probably(text, bool(urls)):
+            self.logger.info('Skip message, maybe advertisement: %s', text)
+            return False
+
+        return True
+
     async def onNewMessage(self, event: events.NewMessage.Event) -> None:
-        self.logger.debug(
+        self.logger.info(
             'Got new message %s\ntype: %s',
             event.stringify(),
             type(event),
         )
         msg: custom.Message = event.message
-        media = msg.media
-        if media is None:
-            self.logger.info('Skip message: No media')
+        if msg.grouped_id:
+            # this is a group of media, i.e. Album, this should be processed
+            # separately
             return
-        if not isinstance(media, (
-                        types.MessageMediaPhoto, types.MessageMediaDocument)):
-            self.logger.info('Skip message: media type %s not intresting',
-                                type(media))
+        if not self.check_message_intresting(msg):
             return
-        urls = msg.get_entities_text(types.MessageEntityTextUrl)
-        text = msg.text or ''
-        if not self._is_advertising_probably(text, bool(urls)):
-            self.logger.info('Skip message, maybe advertisement: %s', text)
+        await self._post_messages([msg])
+
+    async def onAlbum(self, event: events.Album.Event) -> None:
+        self.logger.info(
+            'Got new Album %s\ntype: %s',
+            event.stringify(),
+            type(event),
+        )
+        if not all(filter(self.check_message_intresting, event.messages)):
+            # for now we check that every message is ok,
+            # to better avoid advertising.
+            # Probably there should be another way.
             return
-        await self._post_message(event.message)
+        await self._post_messages(event.messages, True)
 
     async def onAnyEvent(self, event: TLObject) -> None:
-        self.logger.debug(
+        self.logger.info(
             'Got new event %s\ntype: %s\n',
             event.stringify(),
             type(event)
@@ -77,9 +99,12 @@ class Bot:
                 incoming=True, forwards=False, from_users=self.channels
             ),
         )
+        self.client.add_event_handler(self.onAlbum, events.Album(
+            chats=self.channels
+        ))
+
         # TODO: do we want to check forwarded messages ?
         self.client.add_event_handler(self.onAnyEvent, events.UserUpdate())
-        self.client.add_event_handler(self.onAnyEvent, events.Album())
 
         self.client.add_event_handler(self.onAnyEvent, events.CallbackQuery())
         self.client.add_event_handler(self.onAnyEvent, events.ChatAction())
@@ -169,22 +194,26 @@ class Bot:
             return False
         return True
 
-    async def _post_message(self, message: message.Message) -> None:
+    async def _post_messages(self, messages: list[custom.Message], is_album=False) -> None:
         """Post messages to main_channel"""
         try:
-            sendable_message = types.Message(
-                id=message.id,
-                peer_id=message.peer_id,
-                message=message.message or "",
-                date=message.date,
-                media=message.media
-            )
-            # self.main_channel is not None, we check it at `start`, and it is
-            # not list, since we requested only on Entity there
-            await self.client.send_message(self.main_channel,  # type: ignore
-                                           sendable_message)
-            self.logger.debug('send message:\n%s\n', sendable_message)
-            # await self.client.send_file(self.main_channel, files, caption=text)
+            if is_album:
+                await self.client._send_album(self.main_channel, messages)
+                self.logger.debug('send album')
+            else:
+                message = messages[0] # only one message
+                sendable_message = types.Message(
+                    id=message.id,
+                    peer_id=message.peer_id,
+                    message=message.message or "",
+                    date=message.date,
+                    media=message.media
+                )
+                # self.main_channel is not None, we check it at `start`, and it is
+                # not list, since we requested only on Entity there
+                await self.client.send_message(self.main_channel,  # type: ignore
+                                            sendable_message)
+                self.logger.debug('send message:\n%s\n', sendable_message)
         except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
             self.logger.error("Can't send media: %s", err)
         except Exception as err: # something wrong, but I don't want to die here
