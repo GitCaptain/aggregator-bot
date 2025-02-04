@@ -1,21 +1,22 @@
+#!/usr/bin/env bash
+
+set -eu
 
 function help() {
 cat << EOF
-    Usage: ./$(basename $0) Options...
-    Options:
-        --help              Print this help and exit
-        --secret-dir        Path/to/directory with api_hash and api_id files
-        --channel-file      Path to file with tg channels
-        --artifacts-vol     Volume name for bot artifacts (default: ${ARTIFACTS_VOLUME})
-        --main-channel      Channel where to post messages from channels from channel-file
-        --container-name    Container name to run (default: ${CONTAINER_NAME})
-        --image-tag         Image tag to pull from docker hub (default: ${IMAGE_TAG})
-        --rebuild           Do not pull container, force rebuild it.
+Usage: ./$(basename $0) Options...
+Options:
+    --help              Print this help and exit
+    --secret-dir        Path/to/directory with api_hash and api_id files
+    --channel-file      Path to file with tg channels
+    --main-channel      Channel where to post messages from channels from channel-file
+    --container-name    Container name to run (default: ${CONTAINER_NAME})
+    --image-tag         Image tag to pull from docker hub (default: ${IMAGE_TAG})
+    --rebuild           Do not pull container, force rebuild it.
 EOF
 }
 
 CONTAINER_NAME="app_bot"
-ARTIFACTS_VOLUME="artifacts"
 IMAGE_TAG="latest"
 while (($#)); do
     case $1 in
@@ -29,10 +30,6 @@ while (($#)); do
             ;;
         --channel-file)
             CHANNEL_FILE=${2}
-            shift 2
-            ;;
-        --artifacts-vol)
-            ARTIFACTS_VOLUME=${2}
             shift 2
             ;;
         --main-channel)
@@ -61,9 +58,6 @@ done
 [[ -z ${SECRET_DIR} || -z ${CHANNEL_FILE} || -z ${MAIN_CHANNEL} ]] && \
     echo "> Secret dir, channel file ot main channel are not provided" && exit 1
 
-echo "> creating docker volume with name: ${ARTIFACTS_VOLUME}"
-docker volume create ${ARTIFACTS_VOLUME}
-
 if ! ((REBUILD)); then
     echo "> trying to pull docker container"
     docker pull justgivemeregisterplease/app_bot:${IMAGE_TAG} || cant_pull=1
@@ -72,7 +66,7 @@ fi
 if ((REBUILD)) || ((cant_pull)); then
     echo "> can't pull container"
     echo "> start docker build"
-    docker build --tag ${CONTAINER_NAME}:${IMAGE_TAG} --build-arg ARTIFACT_DIR="/${ARTIFACTS_VOLUME}" .
+    docker build --tag ${CONTAINER_NAME}:${IMAGE_TAG} .
 fi
 
 echo "> stop previous container"
@@ -86,15 +80,15 @@ channel_file_name="$(basename ${CHANNEL_FILE})"
     --interactive \
     --detach \
     --network host \
-    --mount source="${ARTIFACTS_VOLUME}",target="/${ARTIFACTS_VOLUME}" \
     --name tg-client-bot \
     --restart always \
     -v "${channel_file_dir}":"/channel_file_dir" \
     ${CONTAINER_NAME}:${IMAGE_TAG} \
-    --work-dir="/${ARTIFACTS_VOLUME}" \
-    --api-id="$(cat ${SECRET_DIR}/api_id)" \
-    --api-hash="$(cat ${SECRET_DIR}/api_hash)" \
-    --channel-file="/channel_file_dir/${channel_file_name}" \
-    --main-channel="${MAIN_CHANNEL}" \
-    --session-name="anon" \
-    --log-file="app.log" )
+    python3 client/main.py \
+        --work-dir="/home/bot" \
+        --api-id="$(cat ${SECRET_DIR}/api_id)" \
+        --api-hash="$(cat ${SECRET_DIR}/api_hash)" \
+        --channel-file="/channel_file_dir/${channel_file_name}" \
+        --main-channel="${MAIN_CHANNEL}" \
+        --session-name="bot" \
+        --log-file="app.log" )
