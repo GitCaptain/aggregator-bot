@@ -48,8 +48,7 @@ RUN rm /tmp/requirements*.txt && \
 USER "${user}"
 
 # copy client code each time version changed
-ARG VERSION=0.1
+ARG VERSION=0.2
 COPY client ${HOME}/client
 
 WORKDIR ${HOME}
-ENTRYPOINT ["python3", "client/main.py"]
