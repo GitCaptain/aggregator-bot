@@ -96,7 +96,7 @@ class Bot:
         self.client.add_event_handler(
             self.onNewMessage,
             events.NewMessage(
-                incoming=True, forwards=False, from_users=self.channels
+                incoming=True, forwards=False, chats=self.channels
             ),
         )
         self.client.add_event_handler(self.onAlbum, events.Album(
@@ -171,15 +171,13 @@ class Bot:
         """main program loop: subscribe, restore info, get content,
         send content, save content"""
 
-        channels, subscribed, meme_folder_id = await asyncio.gather(
+        self.channels, subscribed, meme_folder_id = await asyncio.gather(
             self._enumerate_channels(),
             self.get_subscribed_channels(),
             self.get_meme_folder_id(),
         )
-        usernames = set(channel.username for channel in channels)
-        self.channels = usernames
         self.register_handlers()
-        await self._subscribe_channels(channels, subscribed, meme_folder_id)
+        await self._subscribe_channels(self.channels, subscribed, meme_folder_id)
         await asyncio.Future()
 
     def _is_advertising_probably(self, msg_text: str, url: bool):

@@ -91,4 +91,4 @@ channel_file_name="$(basename ${CHANNEL_FILE})"
         --channel-file="/channel_file_dir/${channel_file_name}" \
         --main-channel="${MAIN_CHANNEL}" \
         --session-name="bot" \
-        --log-file="app.log" &> logs &)
+        --log-file="app.log")
