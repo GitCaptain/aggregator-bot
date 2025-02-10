@@ -203,7 +203,10 @@ class Bot:
         """Post messages to main_channel"""
         try:
             if is_album:
-                await self.client._send_album(self.main_channel, messages)
+                # We can ignore type here, since captions is actually expected
+                # to be iterable, but telethon is not bothering setting right types
+                await self.client._send_album(self.main_channel, messages,
+                                              [m.text for m in messages]) # type: ignore
                 self.logger.debug('send album')
             else:
                 message = messages[0] # only one message
