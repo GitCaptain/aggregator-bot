@@ -38,6 +38,8 @@ class Bot:
         self.memes_folder = memes_folder
         # pylint: disable=invalid-name
         self.me = None
+        # TODO: populate dinamically?
+        self.filters = ['@yababapomogite']
 
     def check_message_intresting(self, message: custom.Message) -> bool:
         media = message.media
@@ -61,6 +63,16 @@ class Bot:
 
         return True
 
+    def apply_text_filters(self, message: custom.Message) -> None:
+        if message.text:
+            newtext = '\n'.join(
+                filter(lambda s: not any(s.startswith(x) for x in self.filters),
+                                 message.text.splitlines()))
+            if newtext != message.text:
+                self.logger.debug('message:\n"%s"\nfiltered to be:\n"%s"\n',
+                                 message.text, newtext)
+            message.text = newtext
+
     async def onNewMessage(self, event: events.NewMessage.Event) -> None:
         self.logger.info(
             'Got new message %s\ntype: %s',
@@ -74,6 +86,7 @@ class Bot:
             return
         if not self.check_message_intresting(msg):
             return
+        self.apply_text_filters(msg)
         await self._post_messages([msg])
 
     async def onAlbum(self, event: events.Album.Event) -> None:
@@ -89,6 +102,8 @@ class Bot:
             # to better avoid advertising.
             # Probably there should be another way.
             return
+        for msg in event.messages:
+            self.apply_text_filters(msg)
         await self._post_messages(event.messages, True)
 
     async def onAnyEvent(self, event: TLObject) -> None:
