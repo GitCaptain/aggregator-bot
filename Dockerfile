@@ -48,7 +48,7 @@ RUN rm /tmp/requirements*.txt && \
 USER "${user}"
 
 # copy client code each time version changed
-ARG VERSION=0.2
+ARG VERSION=0.3
 COPY client ${HOME}/client
 
 WORKDIR ${HOME}
