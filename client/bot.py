@@ -42,43 +42,45 @@ class Bot:
     def check_message_intresting(self, message: custom.Message) -> bool:
         media = message.media
         if media is None:
-            self.logger.debug('Skip message: No media')
+            self.logger.info('Skip message: No media')
             return False
         if not isinstance(media, (
                         types.MessageMediaPhoto, types.MessageMediaDocument)):
-            self.logger.debug('Skip message: media type %s not intresting',
+            self.logger.info('Skip message: media type "%s" is not intresting',
                                 type(media))
             return False
         urls = message.get_entities_text(types.MessageEntityTextUrl)
         text = message.text or ''
         if not self._is_advertising_probably(text, bool(urls)):
-            self.logger.debug('Skip message, maybe advertisement: %s', text)
+            self.logger.info('Skip message, maybe advertisement:\n"%s"\n', text)
             return False
 
         return True
 
     async def onNewMessage(self, event: events.NewMessage.Event) -> None:
-        self.logger.debug(
+        self.logger.info(
             'Got new message %s\ntype: %s',
             event.stringify(),
             type(event),
         )
         msg: custom.Message = event.message
         if msg.grouped_id:
-            # this is a group of media, i.e. Album, this should be processed
-            # separately
+            self.logger.info('This is a group of media, i.e. Album, '
+                             'this should be processed separately')
             return
         if not self.check_message_intresting(msg):
             return
         await self._post_messages([msg])
 
     async def onAlbum(self, event: events.Album.Event) -> None:
-        self.logger.debug(
+        self.logger.info(
             'Got new Album %s\ntype: %s',
             event.stringify(),
             type(event),
         )
-        if not all(filter(self.check_message_intresting, event.messages)):
+        if any(filter(
+                lambda x: not self.check_message_intresting(x), # type: ignore
+                event.messages)):
             # for now we check that every message is ok,
             # to better avoid advertising.
             # Probably there should be another way.
