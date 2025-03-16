@@ -49,6 +49,10 @@ class Bot:
             self.logger.info('Skip message: media type "%s" is not intresting',
                                 type(media))
             return False
+        if isinstance(media, types.MessageMediaDocument) and \
+            (media.round or media.voice):
+            self.logger.info('Media is voice or round - advertisement probably')
+            return False
         urls = message.get_entities_text(types.MessageEntityTextUrl)
         text = message.text or ''
         if not self._is_advertising_probably(text, bool(urls)):
