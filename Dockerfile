@@ -30,12 +30,12 @@ RUN wget -O - https://sh.rustup.rs | sh -s -- -y
 ENV PATH="${HOME}/.cargo/bin:${PATH}"
 
 # if non-empty - dev requirements will be installed
-ARG dev-build=""
+ARG dev_build=""
 
 # I don't think these packages can break something on clean alpine system in
 # docker, and venv in container seems to be overkill, so use
 # `break-system-packages` flag to avoid `externally-managed-environment Error`.
-RUN if [ -n ${dev-build} ]; then suffix="-dev"; fi; \
+RUN if [ -n ${dev_build} ]; then suffix="-dev"; fi; \
     python3 -m pip install --break-system-packages \
             -r "/tmp/requirements${suffix}.txt"
 
