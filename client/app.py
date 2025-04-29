@@ -22,11 +22,13 @@ class App:
         main_channel: str,
         channel_file: str,
         memes_folder: str,
+        posts_limit: int,
+        delay_minutes: int,
     ) -> None:
         self.logger.info('App started')
         session = os.path.join(self.working_dir, session_name)
         with TelegramClient(session, int(self.api_id), self.api_hash) as client:
-            bot = Bot(self, client, FileProcessor(channel_file), memes_folder)
+            bot = Bot(self, client, FileProcessor(channel_file), memes_folder, posts_limit, delay_minutes)
             while True:  # never give up!
                 try:
                     client.loop.run_until_complete(bot.start(main_channel))

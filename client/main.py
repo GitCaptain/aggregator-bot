@@ -32,6 +32,18 @@ def get_argparser() -> argparse.ArgumentParser:
         default=os.path.join(os.path.curdir, 'app_work'),
         help='Directory with bot artifacts',
     )
+    parser.add_argument(
+        '--daily-post-limit',
+        default=30,
+        type=int,
+        help='Maximum posts per day'
+    )
+    parser.add_argument(
+        '--minutes-between-posts',
+        default=20,
+        type=int,
+        help='Delay minutes between post new messages'
+    )
     return parser
 
 
@@ -92,6 +104,8 @@ def main() -> None:
         args.main_channel,
         args.channel_file,
         args.meme_folder,
+        args.daily_post_limit,
+        args.minutes_between_posts,
     )
 
 

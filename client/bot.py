@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timedelta
 from typing import Any, Coroutine
 
 import app
@@ -28,6 +29,8 @@ class Bot:
         client: telethon.TelegramClient,
         file_processor: FileProcessor,
         memes_folder: str,
+        daily_limit: int,
+        delay_minutes: int,
     ) -> None:
         self.client = client
         self.file_processor = file_processor
@@ -36,6 +39,10 @@ class Bot:
         self.main_channel = None
         self.channels = None
         self.memes_folder = memes_folder
+        self.posted = daily_limit
+        self.daily_limit = daily_limit
+        self.delay_seconds = delay_minutes * 60
+        self.last_posted_timestamp = 0
         # pylint: disable=invalid-name
         self.me = None
         # TODO: populate dinamically?
@@ -199,7 +206,17 @@ class Bot:
         )
         self.register_handlers()
         await self._subscribe_channels(self.channels, subscribed, meme_folder_id)
-        await asyncio.Future()
+        await self._clean_counter()
+
+    async def _clean_counter(self) -> None:
+        # self-restartable task to clean-up posts counter every day
+        self.posted = 0
+        today = datetime.today()
+        self.logger.info('New day started: %s, post counter cleared', today)
+        tomorrow_begin = (today + timedelta(days=1)).replace(hour=0, minute=0, second=0)
+        until_next_day = (tomorrow_begin - today).seconds
+        await asyncio.sleep(until_next_day)
+        await self._clean_counter()
 
     def _is_advertising_probably(self, msg_text: str, url: bool):
         """Do my best to filter out messages"""
@@ -214,14 +231,28 @@ class Bot:
             return False
         return True
 
-    async def _on_success_post(self, messages: list[custom.Message]) -> None:
+    async def _mark_messages_readed(self, messages: list[custom.Message]) -> None:
         awaitables = []
         for msg in messages:
             awaitables.append(msg.mark_read())
         await asyncio.gather(*awaitables)
 
+    async def _on_success_post(self, messages: list[custom.Message]) -> None:
+        self.posted += 1
+        await self._mark_messages_readed(messages)
+
     async def _post_messages(self, messages: list[custom.Message], is_album=False) -> None:
         """Post messages to main_channel"""
+        if self.posted >= self.daily_limit:
+            self.logger.info('Daily post limit reached, message ignored.')
+            await self._mark_messages_readed(messages)
+            return
+        now_sec = int(datetime.timestamp(datetime.now()))
+        if now_sec - self.last_posted_timestamp < self.delay_seconds:
+            self.logger.info('Time between posts is less then delay, skip.')
+            await self._mark_messages_readed(messages)
+            return
+        self.last_posted_timestamp = now_sec
         try:
             if is_album:
                 # We can ignore type here, since captions is actually expected
