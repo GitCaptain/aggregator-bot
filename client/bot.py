@@ -214,7 +214,9 @@ class Bot:
         today = datetime.today()
         self.logger.info('New day started: %s, post counter cleared', today)
         tomorrow_begin = (today + timedelta(days=1)).replace(hour=0, minute=0, second=0)
-        until_next_day = (tomorrow_begin - today).seconds
+        # seconds + 1 to avoid multiple wake ups on the 0th second
+        # (since we count tomorrow in seconds)
+        until_next_day = (tomorrow_begin - today).seconds + 1
         await asyncio.sleep(until_next_day)
         await self._clean_counter()
 
