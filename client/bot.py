@@ -92,6 +92,8 @@ class Bot:
                              'this should be processed separately')
             return
         if not self.check_message_intresting(msg):
+            # still mark messages readed
+            await self._mark_messages_readed([msg])
             return
         self.apply_text_filters(msg)
         await self._post_messages([msg])
@@ -108,6 +110,8 @@ class Bot:
             # for now we check that every message is ok,
             # to better avoid advertising.
             # Probably there should be another way.
+            # still mark messages readed
+            await self._mark_messages_readed(event.messages)
             return
         for msg in event.messages:
             self.apply_text_filters(msg)
