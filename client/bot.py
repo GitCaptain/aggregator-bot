@@ -245,6 +245,7 @@ class Bot:
 
     async def _on_success_post(self, messages: list[custom.Message]) -> None:
         self.posted += 1
+        self.logger.info('Messages posted today: %s', self.posted)
         await self._mark_messages_readed(messages)
 
     async def _post_messages(self, messages: list[custom.Message], is_album=False) -> None:
