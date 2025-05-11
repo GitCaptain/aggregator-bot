@@ -10,6 +10,7 @@ Options:
     --secret-dir        Path/to/directory with api_hash and api_id files
     --channel-file      Path to file with tg channels
     --main-channel      Channel where to post messages from channels from channel-file
+    --sub-channel       Channel where to post messages unlimited
     --container-name    Container name to run (default: ${CONTAINER_NAME})
     --image-tag         Image tag to pull from docker hub (default: ${IMAGE_TAG})
     --rebuild           Do not pull container, force rebuild it.
@@ -34,6 +35,10 @@ while (($#)); do
             ;;
         --main-channel)
             MAIN_CHANNEL=${2}
+            shift 2
+            ;;
+        --sub-channel)
+            SUB_CHANNEL=${2}
             shift 2
             ;;
         --image-tag)
@@ -75,6 +80,12 @@ docker container rm -f tg-client-bot
 echo "> run docker container"
 channel_file_dir="$(dirname ${CHANNEL_FILE})"
 channel_file_name="$(basename ${CHANNEL_FILE})"
+
+subchannel_opt=
+if [[ -n "${SUB_CHANNEL}" ]]; then
+    subchannel_opt="--sub-channel=${SUB_CHANNEL}"
+fi
+
 (set -x; docker run \
     --tty \
     --interactive \
@@ -90,5 +101,6 @@ channel_file_name="$(basename ${CHANNEL_FILE})"
         --api-hash="$(cat ${SECRET_DIR}/api_hash)" \
         --channel-file="/channel_file_dir/${channel_file_name}" \
         --main-channel="${MAIN_CHANNEL}" \
+        ${subchannel_opt} \
         --session-name="bot" \
         --log-file="app.log")
