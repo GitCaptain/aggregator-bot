@@ -10,19 +10,19 @@ class FileProcessor:
     # pylint: disable=too-few-public-methods
     def __init__(self, file: str) -> None:
         self.file = file
-        self.logger = logging.getLogger('Main.file_processor')
+        self.logger = logging.getLogger("Main.file_processor")
 
     def channel_generator(self) -> Generator[str, None, None]:
         """Parse channel file, yields channel usernames line by line"""
         try:
-            with open(self.file, encoding='utf-8') as channels:
+            with open(self.file, encoding="utf-8") as channels:
                 for channel in channels:
                     channel = channel.strip()
                     if not channel:
                         continue
                     self.logger.debug('channel parsed: "%s"', channel)
-                    if channel.startswith('#'):
-                        self.logger.debug('skip current channel')
+                    if channel.startswith("#"):
+                        self.logger.debug("skip current channel")
                         continue
                     yield channel
         except FileNotFoundError:
@@ -30,5 +30,5 @@ class FileProcessor:
             # file may be created on next call to this function
             # or we already read what we need.
             self.logger.error(
-                'File %s not found, create file or check path', self.file
+                "File %s not found, create file or check path", self.file
             )

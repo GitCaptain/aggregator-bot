@@ -10,42 +10,56 @@ from app import App
 def get_argparser() -> argparse.ArgumentParser:
     """Setup parser"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--api-id', required=True, help='Your tg app id')
-    parser.add_argument('--api-hash', required=True, help='Your tg app hash')
     parser.add_argument(
-        '--channel-file',
+        "--api-id", type=int, required=True, help="Your tg app id"
+    )
+    parser.add_argument(
+        "--api-hash", type=str, required=True, help="Your tg app hash"
+    )
+    parser.add_argument(
+        "--channel-file",
+        type=str,
         required=True,
-        help='File with channels to get info from',
-    )
-    parser.add_argument('--log-file', default='app.log', help='Log file')
-    parser.add_argument(
-        '--session-name', default='anon', help='Client session name'
+        help="File with channels to get info from",
     )
     parser.add_argument(
-        '--main-channel', required=True, help='Channel to post downloaded media'
+        "--log-file", type=str, default="app.log", help="Log file"
     )
     parser.add_argument(
-        '--sub-channel', default='', help='Channel to repost unlimited memes'
+        "--session-name", type=str, default="anon", help="Client session name"
     )
     parser.add_argument(
-        '--meme-folder', default='memes', help='Folder name for meme channels'
+        "--main-channel",
+        type=str,
+        required=True,
+        help="Channel to post downloaded media",
     )
     parser.add_argument(
-        '--work-dir',
-        default=os.path.join(os.path.curdir, 'app_work'),
-        help='Directory with bot artifacts',
+        "--sub-channel",
+        type=str,
+        default="",
+        help="Channel to repost unlimited memes",
     )
     parser.add_argument(
-        '--daily-post-limit',
-        default=30,
-        type=int,
-        help='Maximum posts per day'
+        "--meme-folder",
+        type=str,
+        default="memes",
+        help="Folder name for meme channels",
     )
     parser.add_argument(
-        '--minutes-between-posts',
+        "--work-dir",
+        type=str,
+        default=os.path.join(os.path.curdir, "app_work"),
+        help="Directory with bot artifacts",
+    )
+    parser.add_argument(
+        "--daily-post-limit", default=30, type=int, help="Maximum posts per day"
+    )
+    parser.add_argument(
+        "--minutes-between-posts",
         default=20,
         type=int,
-        help='Delay minutes between post new messages'
+        help="Delay minutes between post new messages",
     )
     return parser
 
@@ -54,10 +68,10 @@ def setup_logging(logger: logging.Logger, filepath: str) -> None:
     """Setup logger handlers"""
 
     fh = logging.FileHandler(filepath)
-    dbg_fh = logging.FileHandler(f'{filepath}.full')
+    dbg_fh = logging.FileHandler(f"{filepath}.full")
     sh = logging.StreamHandler()
     # TODO: Make this handler send error to user
-    error = logging.FileHandler(f'{filepath}.error')
+    error = logging.FileHandler(f"{filepath}.error")
 
     fh.setLevel(logging.INFO)
     dbg_fh.setLevel(logging.DEBUG)
@@ -65,15 +79,15 @@ def setup_logging(logger: logging.Logger, filepath: str) -> None:
     error.setLevel(logging.ERROR)
 
     formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(name)s: %(message)s'
+        "%(asctime)s - %(levelname)s - %(name)s: %(message)s"
     )
     dbg_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(module)s - %(funcName)s: %(message)s'
+        "%(asctime)s - %(levelname)s - %(module)s - %(funcName)s: %(message)s"
     )
     err_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - '
-        'module: %(module)s, function: %(funcName)s, line: %(lineno)d:\n'
-        '%(message)s'
+        "%(asctime)s - %(levelname)s - "
+        "module: %(module)s, function: %(funcName)s, line: %(lineno)d:\n"
+        "%(message)s"
     )  # maximum info here
     fh.setFormatter(formatter)
     dbg_fh.setFormatter(dbg_formatter)
@@ -87,8 +101,8 @@ def setup_logging(logger: logging.Logger, filepath: str) -> None:
     logger.addHandler(error)
 
     # set telethon logger
-    telethonlog = logging.getLogger('telethon')
-    telethon_hndl = logging.FileHandler(f'{filepath}.telethon.full')
+    telethonlog = logging.getLogger("telethon")
+    telethon_hndl = logging.FileHandler(f"{filepath}.telethon.full")
     telethon_hndl.setLevel(logging.DEBUG)
     telethon_hndl.setFormatter(dbg_formatter)
     telethonlog.addHandler(telethon_hndl)
@@ -99,9 +113,9 @@ def main() -> None:
     parser = get_argparser()
     args, unknown = parser.parse_known_args()
 
-    logger = logging.getLogger('Main')
+    logger = logging.getLogger("Main")
     setup_logging(logger, os.path.join(args.work_dir, args.log_file))
-    logger.info('Started with args: %s, also unknown args: %s', args, unknown)
+    logger.info("Started with args: %s, also unknown args: %s", args, unknown)
     App(args.api_id, args.api_hash, args.work_dir).start(
         args.session_name,
         args.main_channel,
@@ -113,5 +127,5 @@ def main() -> None:
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
