@@ -25,6 +25,9 @@ def get_argparser() -> argparse.ArgumentParser:
         '--main-channel', required=True, help='Channel to post downloaded media'
     )
     parser.add_argument(
+        '--sub-channel', default='', help='Channel to repost unlimited memes'
+    )
+    parser.add_argument(
         '--meme-folder', default='memes', help='Folder name for meme channels'
     )
     parser.add_argument(
@@ -102,6 +105,7 @@ def main() -> None:
     App(args.api_id, args.api_hash, args.work_dir).start(
         args.session_name,
         args.main_channel,
+        args.sub_channel,
         args.channel_file,
         args.meme_folder,
         args.daily_post_limit,

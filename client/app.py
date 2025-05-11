@@ -1,10 +1,10 @@
 import logging
 import os
-import sys
 
 from bot import Bot
+from exceptions import ConfigurationException
 from file_processor import FileProcessor
-from telethon import TelegramClient, events
+from telethon import TelegramClient
 
 
 class App:
@@ -20,6 +20,7 @@ class App:
         self,
         session_name: str,
         main_channel: str,
+        sub_channel: str,
         channel_file: str,
         memes_folder: str,
         posts_limit: int,
@@ -29,9 +30,13 @@ class App:
         session = os.path.join(self.working_dir, session_name)
         with TelegramClient(session, int(self.api_id), self.api_hash) as client:
             bot = Bot(self, client, FileProcessor(channel_file), memes_folder, posts_limit, delay_minutes)
-            while True:  # never give up!
+            stop = False
+            while not stop:  # almost never give up!
                 try:
-                    client.loop.run_until_complete(bot.start(main_channel))
+                    client.loop.run_until_complete(bot.start(main_channel, sub_channel))
+                except ConfigurationException as e:
+                    stop = True
+                    self.logger.fatal('Something problem with bot parameters, no reason to try again:\n%s', e)
                 except Exception as e:
                     self.logger.error('Unhandled exception: %s', e)
 

@@ -3,12 +3,13 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Union
 
 import app
 import telethon
+from exceptions import ConfigurationException
 from file_processor import FileProcessor
-from telethon import events
+from telethon import events, hints
 from telethon.errors import (
     ChannelIdInvalidError,
     ChannelPrivateError,
@@ -37,6 +38,7 @@ class Bot:
         self.owner = owner
         self.logger = logging.getLogger('Main.bot')
         self.main_channel = None
+        self.sub_channel = None
         self.channels = None
         self.memes_folder = memes_folder
         self.posted = daily_limit
@@ -96,7 +98,8 @@ class Bot:
             await self._mark_messages_readed([msg])
             return
         self.apply_text_filters(msg)
-        await self._post_messages([msg])
+        await self._check_limits_and_post_messages([msg])
+        await self._post_messages([msg], self.sub_channel)
 
     async def onAlbum(self, event: events.Album.Event) -> None:
         self.logger.info(
@@ -115,7 +118,8 @@ class Bot:
             return
         for msg in event.messages:
             self.apply_text_filters(msg)
-        await self._post_messages(event.messages, True)
+        await self._check_limits_and_post_messages(event.messages, True)
+        await self._post_messages(event.messages, self.sub_channel, True)
 
     async def onAnyEvent(self, event: TLObject) -> None:
         self.logger.debug(
@@ -146,19 +150,39 @@ class Bot:
         self.client.add_event_handler(self.onAnyEvent, events.MessageRead())
         self.client.add_event_handler(self.onAnyEvent, events.Raw())
 
-    async def start(self, main_channel: str) -> None:
+    async def _cache_and_get_entt(self, requested_entt: str) -> Union['hints.Entity', None]:
+        try:
+            input_entt = await self.client.get_input_entity(requested_entt)
+            # Since previous call accept only one entity - only one entt will be
+            # passed to and returned from `client.get_entity`
+            return await self.client.get_entity(input_entt)  # type: ignore
+        except ValueError:
+            return None
+
+    async def start(self, main_channel: str, sub_channel: str) -> None:
         """Bot entrypoint"""
         self.logger.info('bot started')
         self.logger.info(
             'signed in as: %s', (await self.client.get_me()).stringify()
         )
-        main_channel_input_entt = await self.client.get_input_entity(
-            main_channel
-        )
-        self.main_channel = await self.client.get_entity(
-            main_channel_input_entt
-        )
-        assert self.main_channel, "Main channel not found!"
+        entt = await self._cache_and_get_entt(main_channel)
+        if entt is None:
+            raise ConfigurationException('Main channel not found!')
+        if not isinstance(entt, types.Channel):
+            raise ConfigurationException('Provided name for main channel is not a channel, but: %s', type(entt))
+        self.main_channel = entt
+        if sub_channel:
+            entt = await self._cache_and_get_entt(sub_channel)
+            ok = True
+            if entt is None:
+                self.logger.error("Sub channel is given, but can't be found, please check spelling")
+                ok = False
+            if not isinstance(entt, types.Channel):
+                self.logger.error('Provided name for sub channel is not a channel, but: %s', type(entt))
+                ok = False
+            if ok:
+                # all checks done, but type system don't understand it
+                self.sub_channel: types.Channel = entt  # type: ignore
         await self._main()
 
     async def get_meme_folder_id(self) -> int:
@@ -248,8 +272,8 @@ class Bot:
         self.logger.info('Messages posted today: %s', self.posted)
         await self._mark_messages_readed(messages)
 
-    async def _post_messages(self, messages: list[custom.Message], is_album=False) -> None:
-        """Post messages to main_channel"""
+    async def _check_limits_and_post_messages(self, messages: list[custom.Message], is_album=False) -> None:
+        """Check **main** channel limits, before do actual message post"""
         if self.posted >= self.daily_limit:
             self.logger.info('Daily post limit reached, message ignored.')
             await self._mark_messages_readed(messages)
@@ -260,13 +284,21 @@ class Bot:
             await self._mark_messages_readed(messages)
             return
         self.last_posted_timestamp = now_sec
+        if await self._post_messages(messages, self.main_channel, is_album):
+            # Only do it for main channel
+            await self._on_success_post(messages)
+
+    async def _post_messages(self, messages: list[custom.Message], channel: types.Channel | None, is_album=False) -> bool:
+        """Post messages to given channel"""
+        if channel is None:
+            return False
         try:
             if is_album:
                 # We can ignore type here, since captions is actually expected
                 # to be iterable, but telethon is not bothering setting right types
-                await self.client._send_album(self.main_channel, messages,
+                await self.client._send_album(channel, messages,
                                               [m.text for m in messages]) # type: ignore
-                self.logger.debug('send album')
+                self.logger.debug('send album to channel %s', channel.title)
             else:
                 message = messages[0] # only one message
                 sendable_message = types.Message(
@@ -276,16 +308,14 @@ class Bot:
                     date=message.date,
                     media=message.media
                 )
-                # self.main_channel is not None, we check it at `start`, and it is
-                # not list, since we requested only on Entity there
-                await self.client.send_message(self.main_channel,  # type: ignore
-                                            sendable_message)
-                self.logger.debug('send message:\n%s\n', sendable_message)
-            await self._on_success_post(messages)
+                await self.client.send_message(channel, sendable_message)
+                self.logger.debug('send to channel %s message:\n%s\n', channel.title, sendable_message)
+                return True
         except (telethon.errors.rpcbaseerrors.BadRequestError, TypeError) as err:
             self.logger.error("Can't send media: %s", err)
         except Exception as err: # something wrong, but I don't want to die here
             self.logger.error('Unexpected exception during message posting: %s', err)
+        return False
 
     async def _enumerate_channels(self) -> list[types.Channel]:
         """Get already subscribed channels"""
